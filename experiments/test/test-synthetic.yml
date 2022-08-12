@@ -1,0 +1,147 @@
+# --- MAIN EXPERIMENT SETTINGS
+name: test-synthetic
+description: 'Test benchmark with Synthetic datasets end-to-end'
+role: SageMakerRoleBenchmark
+region: us-east-1
+bucket: null                # 'null' for Default Bucket
+output_prefix: experiments
+parallelism: 6              # 0 is sync execution, >=1 is async execution
+repeat: 1
+disable_profiler: True
+order: interleave           # 'default | 'interleave' | 'random' - order to run the 'repeat'ed trials (not to create hot-spots)
+clean: True                 # 'True' - delete all previous trials before start
+
+
+
+# --- DATASET DEFINITIONS
+datasets: 'datasets/datasets_synthetic.yml'
+
+
+# --- FSx FILESYSTEM SETUP (is required only if 'fsx' input mode is used)
+fsx:
+  fsx_file_system_id: fs-XXXXXXXXXXXXXXXXX   # <--- specify your FSX filesystem ID
+  fsx_file_system_directory_path: /fsx
+  security_group_ids:
+      - sg-XXXXXXXXXXXXXXXXX                 # <--- specify your Security Group IDs
+  subnets:
+      - subnet-XXXXXXXXXXXXXXXXX             # <--- specify your Subnet IDs
+
+
+# --- TRIAL DEFINITIONS
+# Default values for trials (if not overriden by specific trial)
+base_trial:
+  #script: script-nomodel.py
+  source_dir: scripts
+  framework: tf
+  framework_version: '2.4.1'
+  py_version: py37
+  volume_size: 225
+  instance_type: ml.g4dn.8xlarge
+  instance_count: 1
+  max_run: 600
+  hyperparameters:
+    prefetch_first: False
+    prefetch_size: -1
+    prefetch_to_gpu: False
+    num_parallel_calls: -1    # (None or <int>) goes as arg to tf.map (and tf.batch) 
+    num_parallel_reads: -1    # (None or <int>) goes as arg to TFRecordDataset
+    private_pool: 16          # (None or <int>) private workers thread pool
+    epochs: 1
+    batch_size: 32
+    shuffle: False
+    backbone_model: resnet50
+    input_dim: 300
+    cache: None               # None, 'mem', or <path> for on-disk cache (e.g. 'tmp/cache')
+    
+
+# Trial definitions
+trials: 
+
+  # --- NOMODEL tests ---
+  nomodel-ffm:
+    script: script-nomodel.py
+    inputs:
+      train:
+        dataset: Synth-100MB-a-1MB
+        input_mode: ffm
+
+  nomodel-file:
+    script: script-nomodel.py
+    inputs:
+      train:
+        dataset: Synth-100MB-a-1MB
+        input_mode: file
+
+  nomodel-pipe:
+    script: script-nomodel.py
+    inputs:
+      train:
+        dataset: Synth-100MB-a-1MB
+        input_mode: pipe
+
+  nomodel-fsx:
+    script: script-nomodel.py
+    inputs:
+      train:
+        dataset: Synth-100MB-a-1MB
+        input_mode: fsx
+
+  nomodel-s3tf:
+    script: script-nomodel.py
+    inputs:
+      train:
+        dataset: Synth-100MB-a-1MB
+        input_mode: s3tf
+
+  nomodel-ffm-2:
+    script: script-nomodel.py
+    inputs:
+      train:
+        dataset: Synth-1GB-a-100MB
+        input_mode: ffm
+    hyperparameters:
+      batch_size: 32
+
+
+  # --- MODEL tests ---
+  model-ffm:
+    script: script-model.py
+    inputs:
+      train:
+        dataset: Synth-100MB-a-1MB
+        input_mode: ffm
+
+  model-file:
+    script: script-model.py
+    inputs:
+      train:
+        dataset: Synth-100MB-a-1MB
+        input_mode: file
+
+  model-pipe:
+    script: script-model.py
+    inputs:
+      train:
+        dataset: Synth-100MB-a-1MB
+        input_mode: pipe
+
+  model-fsx:
+    script: script-model.py
+    inputs:
+      train:
+        dataset: Synth-100MB-a-1MB
+        input_mode: fsx
+
+  model-s3tf:
+    script: script-model.py
+    inputs:
+      train:
+        dataset: Synth-100MB-a-1MB
+        input_mode: s3tf
+
+  model-ffm-2:
+    script: script-model.py
+    inputs:
+      train:
+        dataset: Synth-1GB-a-100MB
+        input_mode: ffm

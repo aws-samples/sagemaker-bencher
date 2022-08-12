@@ -1,0 +1,98 @@
+Synth-100MB-a-1MB:
+    type: synthetic
+    format: tfrecord/raw
+    bucket: null
+    prefix: 'datasets/synthetic'
+    dimension: [300, 300, 3]
+    num_records: 4
+    num_files: 10
+    num_copies: 10
+    num_classes: 2
+
+Synth-1GB-a-1MB:
+    type: synthetic
+    format: tfrecord/raw
+    bucket: null
+    prefix: 'datasets/synthetic'
+    dimension: [300, 300, 3]
+    num_records: 4
+    num_files: 50
+    num_copies: 20
+    num_classes: 2
+
+Synth-1GB-a-100MB:
+    type: synthetic
+    format: tfrecord/raw
+    bucket: null
+    prefix: 'datasets/synthetic'
+    dimension: [300, 300, 3]
+    num_records: 400
+    num_files: 1
+    num_copies: 10
+    num_classes: 2
+
+Synth-50GB-a-1MB:
+    type: synthetic
+    format: tfrecord/raw
+    bucket: null
+    prefix: 'datasets/synthetic'
+    dimension: [300, 300, 3]
+    num_records: 4
+    num_files: 50
+    num_copies: 1000
+    num_classes: 2
+
+Synth-50GB-a-100MB:
+    type: synthetic
+    format: tfrecord/raw
+    bucket: null
+    prefix: 'datasets/synthetic'
+    dimension: [300, 300, 3]
+    num_records: 400
+    num_files: 1
+    num_copies: 500
+    num_classes: 2
+
+Synth-100GB-a-1MB:
+    type: synthetic
+    format: tfrecord/raw
+    bucket: null
+    prefix: 'datasets/synthetic'
+    dimension: [300, 300, 3]
+    num_records: 4
+    num_files: 100
+    num_copies: 1000
+    num_classes: 2
+
+Synth-100GB-a-1GB:
+    type: synthetic
+    format: tfrecord/raw
+    bucket: null
+    prefix: 'datasets/synthetic'
+    dimension: [300, 300, 3]
+    num_records: 4000
+    num_files: 10
+    num_copies: 10
+    num_classes: 2
+
+Synth-1TB-a-1MB:
+    type: synthetic
+    format: tfrecord/raw
+    bucket: null
+    prefix: 'datasets/synthetic'
+    dimension: [300, 300, 3]
+    num_records: 4
+    num_files: 1000
+    num_copies: 1000
+    num_classes: 2
+
+Synth-1TB-a-1GB:
+    type: synthetic
+    format: tfrecord/raw
+    bucket: null
+    prefix: 'datasets/synthetic'
+    dimension: [300, 300, 3]
+    num_records: 4000
+    num_files: 10
+    num_copies: 100
+    num_classes: 2

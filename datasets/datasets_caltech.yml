@@ -1,0 +1,52 @@
+Caltech-tfr-raw-1x:
+    type: caltech
+    format: tfrecord/raw
+    bucket: null
+    prefix: 'datasets/caltech'
+    num_records: 3061
+    num_copies: 1
+
+Caltech-tfr-jpg-1x:
+    type: caltech
+    format: tfrecord/jpg
+    bucket: null
+    prefix: 'datasets/caltech'
+    num_records: 3061
+    num_copies: 1
+
+Caltech-jpg-1x:
+    type: caltech
+    format: jpg
+    bucket: null
+    prefix: 'datasets/caltech'
+    num_copies: 1
+    
+Caltech-tfr-jpg-10x:
+    type: caltech
+    format: tfrecord/jpg
+    bucket: null
+    prefix: 'datasets/caltech'
+    num_records: 3061
+    num_copies: 10
+
+Caltech-jpg-10x:
+    type: caltech
+    format: jpg
+    bucket: null
+    prefix: 'datasets/caltech'
+    num_copies: 10
+    
+Caltech-tfr-jpg-50x:
+    type: caltech
+    format: tfrecord/jpg
+    bucket: null
+    prefix: 'datasets/caltech'
+    num_records: 3061
+    num_copies: 50
+
+Caltech-jpg-50x:
+    type: caltech
+    format: jpg
+    bucket: null
+    prefix: 'datasets/caltech'
+    num_copies: 50

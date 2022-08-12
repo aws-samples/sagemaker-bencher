@@ -1,0 +1,95 @@
+Caltech-tfrsize-1n:
+    type: caltech
+    format: tfrecord/jpg
+    bucket: null
+    prefix: 'datasets/caltech-fsize'
+    num_records: 1
+    num_copies: 1
+
+Caltech-tfrsize-2n:
+    type: caltech
+    format: tfrecord/jpg
+    bucket: null
+    prefix: 'datasets/caltech-fsize'
+    num_records: 2
+    num_copies: 1
+
+Caltech-tfrsize-4n:
+    type: caltech
+    format: tfrecord/jpg
+    bucket: null
+    prefix: 'datasets/caltech-fsize'
+    num_records: 4
+    num_copies: 1
+    
+Caltech-tfrsize-8n:
+    type: caltech
+    format: tfrecord/jpg
+    bucket: null
+    prefix: 'datasets/caltech-fsize'
+    num_records: 8
+    num_copies: 1
+
+Caltech-tfrsize-16n:
+    type: caltech
+    format: tfrecord/jpg
+    bucket: null
+    prefix: 'datasets/caltech-fsize'
+    num_records: 16
+    num_copies: 1
+    
+Caltech-tfrsize-32n:
+    type: caltech
+    format: tfrecord/jpg
+    bucket: null
+    prefix: 'datasets/caltech-fsize'
+    num_records: 32
+    num_copies: 1
+
+Caltech-tfrsize-64n:
+    type: caltech
+    format: tfrecord/jpg
+    bucket: null
+    prefix: 'datasets/caltech-fsize'
+    num_records: 64
+    num_copies: 1
+    
+Caltech-tfrsize-128n:
+    type: caltech
+    format: tfrecord/jpg
+    bucket: null
+    prefix: 'datasets/caltech-fsize'
+    num_records: 128
+    num_copies: 1
+    
+Caltech-tfrsize-256n:
+    type: caltech
+    format: tfrecord/jpg
+    bucket: null
+    prefix: 'datasets/caltech-fsize'
+    num_records: 256
+    num_copies: 1
+    
+Caltech-tfrsize-512n:
+    type: caltech
+    format: tfrecord/jpg
+    bucket: null
+    prefix: 'datasets/caltech-fsize'
+    num_records: 512
+    num_copies: 1
+    
+Caltech-tfrsize-1024n:
+    type: caltech
+    format: tfrecord/jpg
+    bucket: null
+    prefix: 'datasets/caltech-fsize'
+    num_records: 1024
+    num_copies: 1
+    
+Caltech-tfrsize-2048n:
+    type: caltech
+    format: tfrecord/jpg
+    bucket: null
+    prefix: 'datasets/caltech-fsize'
+    num_records: 2048
+    num_copies: 1

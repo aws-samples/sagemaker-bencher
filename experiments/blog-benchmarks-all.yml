@@ -1,0 +1,121 @@
+# --- MAIN EXPERIMENT SETTINGS
+name: blog-benchmarks-all
+description: 'Benchmarks -- Blog: Choose the best data source for your Amazon SageMaker training job'
+role: SageMakerRoleBenchmark
+region: us-east-1
+bucket: null                # 'null' for Default Bucket
+output_prefix: experiments
+parallelism: 6              # 0 is sync execution, >=1 is async execution
+repeat: 3
+disable_profiler: True
+order: interleave           # 'default | 'interleave' | 'random' - order to run the 'repeat'ed trials (not to create hot-spots)
+clean: False                # 'True' - delete all previous trials before start
+
+
+
+# --- DATASET DEFINITIONS
+datasets: 'datasets/datasets_caltech.yml'
+
+
+# --- FSx FILESYSTEM SETUP (is required only if 'fsx' input mode is used)
+fsx:
+  fsx_file_system_id: fs-XXXXXXXXXXXXXXXXX   # <--- specify your FSX filesystem ID
+  fsx_file_system_directory_path: /fsx
+  security_group_ids:
+      - sg-XXXXXXXXXXXXXXXXX                 # <--- specify your Security Group IDs
+  subnets:
+      - subnet-XXXXXXXXXXXXXXXXX             # <--- specify your Subnet IDs
+
+
+# --- TRIAL DEFINITIONS
+# Default values for trials (if not overriden by specific trial)
+base_trial:
+  script: script-model.py
+  source_dir: scripts
+  framework: tf
+  framework_version: '2.4.1'
+  py_version: py37
+  volume_size: 500
+  instance_type: ml.p3.2xlarge
+  instance_count: 1
+  max_run: 36000
+  hyperparameters:
+    prefetch_first: False
+    prefetch_size: -1
+    prefetch_to_gpu: False
+    num_parallel_calls: -1    # ('None' or int) goes as arg to tf.map (and tf.batch) 
+    num_parallel_reads: -1    # ('None' or int) goes as arg to TFRecordDataset
+    private_pool: 8           # ('None' or int) private workers thread pool
+    epochs: 1
+    backbone_model: resnet50
+    batch_size: 64
+    input_dim: 224
+    cache: None               # None, 'mem', or <path> for on-disk cache (e.g. 'tmp/cache')
+
+
+# Trial definitions
+trials:
+
+# ==== JPG-File: 1x ====
+  - inputs:
+      train:
+        dataset: Caltech-jpg-1x
+        input_mode: file
+    
+  - inputs:
+      train:
+        dataset: Caltech-jpg-1x
+        input_mode: fsx
+    
+  - inputs:
+      train:
+        dataset: Caltech-jpg-1x
+        input_mode: ffm
+
+# ==== JPG-File: 50x ====
+  - inputs:
+      train:
+        dataset: Caltech-jpg-50x
+        input_mode: file
+    
+  - inputs:
+      train:
+        dataset: Caltech-jpg-50x
+        input_mode: fsx
+    
+  - inputs:
+      train:
+        dataset: Caltech-jpg-50x
+        input_mode: ffm
+    
+# ==== TFR-JPG-File: 1x ====
+  - inputs:
+      train:
+        dataset: Caltech-tfr-jpg-1x
+        input_mode: file
+    
+  - inputs:
+      train:
+        dataset: Caltech-tfr-jpg-1x
+        input_mode: fsx
+    
+  - inputs:
+      train:
+        dataset: Caltech-tfr-jpg-1x
+        input_mode: ffm
+
+# ==== TFR-JPG-File: 50x ====
+  - inputs:
+      train:
+        dataset: Caltech-tfr-jpg-50x
+        input_mode: file
+    
+  - inputs:
+      train:
+        dataset: Caltech-tfr-jpg-50x
+        input_mode: fsx
+    
+  - inputs:
+      train:
+        dataset: Caltech-tfr-jpg-50x
+        input_mode: ffm

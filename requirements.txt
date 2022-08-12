@@ -1,0 +1,11 @@
+sagemaker-experiments
+tensorflow~=2.5.0
+pyyaml~=5.4.1
+sagemaker
+boto3
+botocore
+numpy~=1.19.5
+tqdm
+requests
+Pillow
+gdown
