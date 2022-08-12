@@ -68,4 +68,4 @@ Once started, the results of every conducted trial will be fully logged using Sa
 
 When benchmark is finished, the results can be conveniently pulled down to, e.g., a Pandas DataFrame and easily analysed with any tools of your choice. As an example, see [`result_analysis/analyze-and-plot-benchmarks.ipynb`](result_analysis/analyze-and-plot-benchmarks.ipynb) notebook to replicate the benchmark analysis and plots discussed in the mentioned blog post, or produce your own additional plots:
 
-![SageMaker Experiment tracking](doc/sm_analysis.png)
+![SageMaker Experiment tracking](doc/sm_analysis_blog.png)
