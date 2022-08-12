@@ -69,3 +69,11 @@ Once started, the results of every conducted trial will be fully logged using Sa
 When benchmark is finished, the results can be conveniently pulled down to, e.g., a Pandas DataFrame and easily analysed with any tools of your choice. As an example, see [`result_analysis/analyze-and-plot-benchmarks.ipynb`](result_analysis/analyze-and-plot-benchmarks.ipynb) notebook to replicate the benchmark analysis and plots discussed in the mentioned blog post, or produce your own additional plots:
 
 ![SageMaker Experiment tracking](doc/sm_analysis_blog.png)
+
+## End-to-End Tests
+
+In order to ensure that everything is set up correctly (python packages, IAM roles, optional FSx volumes, etc.), one can quickly run a set of tests:
+
+- `python bencher.py -f experiments/test/test-caltech.yml` - to test different SageMaker data ingestion mechanisms on Caltech dataset
+- `python bencher.py -f experiments/test/test-synthetic.yml` - to test different SageMaker data ingestion mechanisms on synthetic dataset
+- `python bencher.py -f experiments/test/test-s3prefix.yml` - to test different SageMaker data ingestion mechanisms on any generic dataset stored on S3 (the dataset has to be manually created and uploaded to the specified S3 location)
