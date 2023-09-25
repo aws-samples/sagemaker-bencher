@@ -2,10 +2,10 @@
 name: test-s3prefix
 description: 'Test benchmark with S3Prefix datasets end-to-end'
 role: SageMakerRoleBenchmark
-region: us-east-1
+region: us-west-2
 bucket: null                # 'null' for Default Bucket
 output_prefix: experiments
-parallelism: 6              # 0 is sync execution, >=1 is async execution
+parallelism: 6              # 0 is sync execution, >0 is async execution
 repeat: 1
 disable_profiler: True
 order: interleave           # 'default | 'interleave' | 'random' - order to run the 'repeat'ed trials (not to create hot-spots)
@@ -15,16 +15,16 @@ clean: True                 # 'True' - delete all previous trials before start
 
 # --- DATASET DEFINITIONS
 datasets:
-  Synth-100MB-a-1MB:
+  Synth-tfr-jpg-100MB-a-1MB:
     type: s3prefix
-    format: tfrecord/raw
-    bucket: sagemaker-benchmark-us-east-1-242711262407
+    format: tfrecord/jpg
+    bucket: sagemaker-benchmark-us-west-2-XXXXXXXXXXXX
     prefix: 'datasets/synthetic'
 
-  Synth-1GB-a-100MB:
+  Synth-tfr-jpg-1GB-a-100MB:
     type: s3prefix
-    format: tfrecord/raw
-    bucket: sagemaker-benchmark-us-east-1-242711262407
+    format: tfrecord/jpg
+    bucket: sagemaker-benchmark-us-west-2-XXXXXXXXXXXX
     prefix: 'datasets/synthetic'
 
 
@@ -47,7 +47,7 @@ base_trial:
   framework_version: '2.4.1'
   py_version: py37
   volume_size: 225
-  instance_type: ml.g4dn.2xlarge
+  instance_type: ml.g4dn.8xlarge
   instance_count: 1
   max_run: 600
   hyperparameters:
@@ -73,42 +73,42 @@ trials:
     script: script-nomodel.py
     inputs:
       train:
-        dataset: Synth-100MB-a-1MB
+        dataset: Synth-tfr-jpg-100MB-a-1MB
         input_mode: ffm
 
   nomodel-file:
     script: script-nomodel.py
     inputs:
       train:
-        dataset: Synth-100MB-a-1MB
+        dataset: Synth-tfr-jpg-100MB-a-1MB
         input_mode: file
 
   nomodel-pipe:
     script: script-nomodel.py
     inputs:
       train:
-        dataset: Synth-100MB-a-1MB
+        dataset: Synth-tfr-jpg-100MB-a-1MB
         input_mode: pipe
 
   nomodel-fsx:
     script: script-nomodel.py
     inputs:
       train:
-        dataset: Synth-100MB-a-1MB
+        dataset: Synth-tfr-jpg-100MB-a-1MB
         input_mode: fsx
 
   nomodel-s3tf:
     script: script-nomodel.py
     inputs:
       train:
-        dataset: Synth-100MB-a-1MB
+        dataset: Synth-tfr-jpg-100MB-a-1MB
         input_mode: s3tf
 
   nomodel-ffm-2:
     script: script-nomodel.py
     inputs:
       train:
-        dataset: Synth-1GB-a-100MB
+        dataset: Synth-tfr-jpg-1GB-a-100MB
         input_mode: ffm
 
 # --- MODEL tests ---
@@ -116,40 +116,40 @@ trials:
     script: script-model.py
     inputs:
       train:
-        dataset: Synth-100MB-a-1MB
+        dataset: Synth-tfr-jpg-100MB-a-1MB
         input_mode: ffm
 
   model-file:
     script: script-model.py
     inputs:
       train:
-        dataset: Synth-100MB-a-1MB
+        dataset: Synth-tfr-jpg-100MB-a-1MB
         input_mode: file
 
   model-pipe:
     script: script-model.py
     inputs:
       train:
-        dataset: Synth-100MB-a-1MB
+        dataset: Synth-tfr-jpg-100MB-a-1MB
         input_mode: pipe
 
   model-fsx:
     script: script-model.py
     inputs:
       train:
-        dataset: Synth-100MB-a-1MB
+        dataset: Synth-tfr-jpg-100MB-a-1MB
         input_mode: fsx
 
   model-s3tf:
     script: script-model.py
     inputs:
       train:
-        dataset: Synth-100MB-a-1MB
+        dataset: Synth-tfr-jpg-100MB-a-1MB
         input_mode: s3tf
 
   model-ffm-2:
     script: script-model.py
     inputs:
       train:
-        dataset: Synth-1GB-a-100MB
+        dataset: Synth-tfr-jpg-1GB-a-100MB
         input_mode: ffm

@@ -6,10 +6,15 @@ import os
 import time
 from functools import lru_cache
 from collections.abc import Mapping
+import concurrent.futures as cf
 
+import tqdm
 import boto3
 import botocore
 from botocore.exceptions import ClientError
+
+import logging
+logging.getLogger('botocore').setLevel(logging.CRITICAL)
 
 
 def list_to_dict(inp, prefix='t'):
@@ -118,6 +123,7 @@ def download_file_from_google_drive(file_id, root, filename=None):
 
     os.makedirs(root, exist_ok=True)
     gdown.download(f'https://drive.google.com/uc?id={file_id}', fpath, quiet=False)
+    return fpath
 
 
 @lru_cache()
@@ -135,3 +141,26 @@ def upload_file(bucket_name, file, key):
     s3 = get_s3_resource()
     bucket = s3.Bucket(bucket_name)
     bucket.put_object(Key=key, Body=open(file, 'rb'))
+
+
+def upload_dataset(dataset, local_files, remote_subdir=None):
+    print("[{}] Uploading dataset to '{}'..".format(dataset, dataset.s3_uri))
+
+    futures = []
+    with tqdm.tqdm(total=len(local_files) * dataset.num_copies) as pbar:
+        with cf.ProcessPoolExecutor(2 * os.cpu_count()) as executor:
+            for i, file_path in enumerate(local_files):
+                file_base = os.path.basename(file_path)
+                file_name, file_ext = os.path.splitext(file_base)
+                for copy_index in range(dataset.num_copies):
+                    remote_base = '{}-{:03d}{}'.format(file_name, copy_index, file_ext)
+                    remote_subpath = '{:03d}/{}'.format(remote_subdir[i], remote_base) if remote_subdir else remote_base
+                    remote_key = '{}/{}/{}'.format(dataset.prefix, dataset.name, remote_subpath)
+                    futures.append(executor.submit(upload_file, dataset.bucket_name, file_path, remote_key))
+
+            for f in cf.as_completed(futures):
+                try:
+                    _ = f.result()
+                    pbar.update(1)
+                except Exception as e:
+                    print(e)

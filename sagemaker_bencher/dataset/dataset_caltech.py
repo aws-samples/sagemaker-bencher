@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: MIT-0
 
 
-import concurrent.futures as cf
 import os
 import tarfile
 import shutil
@@ -13,24 +12,34 @@ import tensorflow as tf
 import numpy as np
 from PIL import Image 
 
-import sagemaker_bencher.utils as utils
-from .dataset import BenchmarkDataset
+from sagemaker_bencher import utils
+from sagemaker_bencher.dataset import BenchmarkDataset
 
 
 class CaltechBenchmarkDataset(BenchmarkDataset):
 
     input_formats = {'tfrecord/raw', 'tfrecord/jpg', 'jpg'}
 
-    def __init__(self, name, format, bucket, prefix, region, num_copies, num_records=None):
-        """Create a SyntheticBenchmarkDataset.
+    def __init__(self, name, format, type, bucket, prefix, region, num_copies, num_records=None):
+        """
+        Create a SyntheticBenchmarkDataset.
 
         Args:
-            name (str): The name of the dataset
-            bucket (str): An S3 bucket to store the dataset in
-            prefix (str): An S3 prefix directory to store dataset objects in, within the bucket
-            format (str): either 'tfrecord/raw', 'tfrecord/jpg', or 'jpg'
-            num_records (int): How many records to write in each dataset file (applies only to format='tfrecord').
-            num_copies (int): How many times to duplicate each file when being uploaded to s3.
+            name (str): The name of the dataset.
+            format (str): The format of the dataset, which can be one of the following:
+                        - 'tfrecord/raw': TFRecord format with raw image arrays.
+                        - 'tfrecord/jpg': TFRecord format with JPG compression.
+                        - 'jpg': JPG image format.
+            type (str): The type of the dataset.
+            bucket (str): The name of the S3 bucket where the dataset will be stored.
+            prefix (str): The prefix within the S3 bucket.
+            region (str): The AWS region where the S3 bucket is located.
+            num_copies (int): How many times to duplicate each file when being uploaded to S3.
+            num_records (int, optional): How many records to write in each dataset file (applies only to format='tfrecord/*').
+
+        Raises:
+            NotImplementedError: If an unsupported format is provided.
+            ValueError: If the format is 'tfrecord' but num_records is not provided or the format argument is not in the expected format.
         """
 
         if format not in self.input_formats:
@@ -45,14 +54,13 @@ class CaltechBenchmarkDataset(BenchmarkDataset):
 
         self.num_copies = num_copies
         self.num_records = num_records
-        self.verbose = False
+        self.verbose = True
         self.num_classes = 257
         self.num_samples = 30607 * num_copies
 
-        super().__init__(name, format, bucket=bucket, prefix=prefix, region=region)
+        super().__init__(name, format=format, type=type, bucket=bucket, prefix=prefix, region=region)
 
-
-    def build(self, overwrite=False):
+    def build(self, overwrite=False, source_file=None):
         """Build the dataset and upload to s3.
 
         Args:
@@ -64,27 +72,24 @@ class CaltechBenchmarkDataset(BenchmarkDataset):
         else:
             print(f"Building dataset '{self.name}'..")
         self.root_dir = tempfile.mkdtemp()
-        self._download_from_source(untar=True)
+        self._download_and_extract_from_source(untar=True, source_file=source_file)
         img_list, label_list = self._parse_dataset(file_extensions=['.jpg'])
 
         benchmark_files, remote_subdirs = self._make_benchmark_files(img_list, label_list)
-        self._upload_to_s3(benchmark_files, remote_subdirs)
+        utils.upload_dataset(self, benchmark_files, remote_subdirs)
         self._cleanup()
-        
 
-    def _download_from_source(self, untar=False):
+    def _download_and_extract_from_source(self, untar=False, source_file=None):
         caltech_gd = '1r6o0pSROcV1_VwT4oSjA2FBUSCWGuxLK'
         caltech_md5 = '67b4f42ca05d46448c6bb8ecd2220f6d'
-        caltech_file = 'caltech256.tar'
 
-        print(f"Downloading '{caltech_gd}' into '{os.path.join(self.root_dir, caltech_file)}'..")
-        utils.download_file_from_google_drive(caltech_gd, self.root_dir, caltech_file)
+        if not source_file:
+            source_file = utils.download_file_from_google_drive(caltech_gd, self.root_dir, 'caltech256.tar')
 
         if untar:
-            tar = tarfile.open(os.path.join(self.root_dir, caltech_file))
+            tar = tarfile.open(source_file)
             tar.extractall(self.root_dir)
             tar.close()
-
 
     def _parse_dataset(self, file_extensions=None, sort=False):
 
@@ -105,7 +110,6 @@ class CaltechBenchmarkDataset(BenchmarkDataset):
 
         return img_list, label_list
 
-
     def _make_benchmark_files(self, img_list, label_list):
         assert len(img_list) == len(label_list), "Length of images and labels must match!.."
 
@@ -118,12 +122,11 @@ class CaltechBenchmarkDataset(BenchmarkDataset):
                 tfr_path = os.path.join(self.root_dir, 'data-{:06d}.tfrecord'.format(len(tfr_list)))
                 print("[{}] Generating TFRecord file '{}'..".format(self, os.path.basename(tfr_path)))
                 inx_slice = slice(inx, inx + self.num_records)
-                self._build_record_file(tfr_path, img_list[inx_slice], label_list[inx_slice], self.format)
+                self._write_record_file(tfr_path, img_list[inx_slice], label_list[inx_slice], self.format)
                 tfr_list.append(tfr_path)
             return tfr_list, None
 
-
-    def _build_record_file(self, filename, image_list, label_list, format):
+    def _write_record_file(self, filename, image_list, label_list, format):
 
         def _read_bytes(file):
             with open(file, 'rb') as img_file:
@@ -154,28 +157,22 @@ class CaltechBenchmarkDataset(BenchmarkDataset):
                 _write_fn(f, _read_fn(image), label)
 
 
-    def _upload_to_s3(self, local_files, remote_subdir=None):
-        print("[{}] Uploading dataset to '{}'..".format(self, self.s3_uri))
-
-        futures = []
-        with tqdm.tqdm(total=len(local_files)*self.num_copies) as pbar:
-            with cf.ProcessPoolExecutor(2 * os.cpu_count()) as executor:
-                for i, file_path in enumerate(local_files):
-                    file_base = os.path.basename(file_path)
-                    file_name, file_ext = os.path.splitext(file_base)
-                    for copy_index in range(self.num_copies):
-                        remote_base = '{}-{:03d}{}'.format(file_name, copy_index, file_ext)
-                        remote_subpath = '{:03d}/{}'.format(remote_subdir[i], remote_base) if remote_subdir else remote_base
-                        remote_key = '{}/{}/{}'.format(self.prefix, self.name, remote_subpath)
-                        futures.append(executor.submit(utils.upload_file, self.bucket_name, file_path, remote_key))
-
-                for f in cf.as_completed(futures):
-                    try:
-                        _ = f.result()
-                        pbar.update(1)
-                    except Exception as e:
-                        print(e)
-
-
     def _cleanup(self):
         shutil.rmtree(self.root_dir)
+
+
+if __name__ == '__main__':
+
+    region = 'us-west-2'
+
+    dataset = CaltechBenchmarkDataset(
+        name='test1',
+        format='tfrecord/jpg',
+        bucket=f'sagemaker-benchmark-{region}-XXXXXXXXXX',
+        prefix='datasets/caltech-test',
+        region=region,
+        num_records=100,
+        num_copies=2,
+    )
+
+    dataset.build()

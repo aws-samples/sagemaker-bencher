@@ -2,7 +2,7 @@
 name: test-caltech
 description: 'Test benchmark with Caltech datasets end-to-end'
 role: SageMakerRoleBenchmark
-region: us-east-1
+region: us-west-2
 bucket: null                # 'null' for Default Bucket
 output_prefix: experiments
 parallelism: 6              # 0 is sync execution, >=1 is async execution

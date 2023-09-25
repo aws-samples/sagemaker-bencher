@@ -1,11 +1,12 @@
 sagemaker-experiments
-tensorflow~=2.5.0
-pyyaml~=5.4.1
+tensorflow
+pyyaml
 sagemaker
 boto3
 botocore
-numpy~=1.19.5
+numpy
 tqdm
 requests
 Pillow
 gdown
+shortuuid

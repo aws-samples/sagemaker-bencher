@@ -2,17 +2,20 @@
 # SPDX-License-Identifier: MIT-0
 
 
-import concurrent.futures as cf
+import io
 import os
+import random
 import shutil
 import tempfile
+import shortuuid
 
 import tqdm
 import numpy as np
 import tensorflow as tf
+from PIL import Image as pil_image
 
-import sagemaker_bencher.utils as utils
-from .dataset import BenchmarkDataset
+from sagemaker_bencher import utils
+from sagemaker_bencher.dataset import BenchmarkDataset
 
 
 class SyntheticBenchmarkDataset(BenchmarkDataset):
@@ -27,33 +30,40 @@ class SyntheticBenchmarkDataset(BenchmarkDataset):
     prefix.
     """
 
-    input_formats = {'tfrecord/raw'}
+    input_formats = {'tfrecord/raw', 'tfrecord/jpg', 'jpg'}
 
-    def __init__(self, name, format, bucket, prefix, region,
-                 dimension, num_records, num_files, num_copies, num_classes):
+    def __init__(self, name, format, type, bucket, prefix, region, dimension,
+                 num_files, num_copies, num_classes, num_records=None):
         """Create a SyntheticBenchmarkDataset.
 
         Args:
+            name (str): The name of the dataset.
+            format (str): The format of the dataset.
+            type (str): The type of the dataset.
+            bucket (str): The name of the S3 bucket where the dataset will be stored.
+            prefix (str): The prefix within the S3 bucket.
+            region (str): The AWS region where the S3 bucket is located.
             dimension (int): The number of features in the dataset.
-            num_records (int): How many records to write in each dataset file.
+            num_records (int, optional): How many records to write in each dataset file.
             num_files (int): How many distinct files of unique labeled records to create.
-            num_copies (int): How many times to duplicate each file when being uploaded to s3.
+            num_copies (int): How many times to duplicate each file when being uploaded to S3.
             num_classes (int): How many classes to generate.
-            (+ other args to parent class)
         """
+
+        if format not in self.input_formats:
+            raise NotImplementedError("Implemented input formats are '{}', but '{}' requested!..").format(
+                self.input_formats, format)
         
         self.dimension = dimension
         self.num_records = num_records
         self.num_files = num_files
         self.num_copies = num_copies
         self.num_classes = num_classes
-        self.num_samples = num_files * num_copies * num_records
+        self.num_samples = num_files * num_copies * (num_records or 1)
+        self.verbose = True
 
-        if format not in self.input_formats:
-            raise NotImplementedError("Implemented input formats are '{}', but '{}' requested!..").format(
-                self.input_formats, format)
+        super().__init__(name, format=format, type=type, bucket=bucket, prefix=prefix, region=region)
 
-        super().__init__(name, format, bucket=bucket, prefix=prefix, region=region)
 
     def build(self, overwrite=False):
         """Build the dataset and upload to s3.
@@ -66,62 +76,108 @@ class SyntheticBenchmarkDataset(BenchmarkDataset):
             return
         else:
             print(f"Building dataset '{self.name}'..")
-        self.root_dir = tempfile.mkdtemp()
-        self._make_benchmark_files()
-        self._upload_to_s3()
+        self.root_dir = tempfile.mkdtemp() # tempfile.mkdtemp(prefix=self.name + '-', dir='test-build')
+        benchmark_files, remote_subdirs = self._make_benchmark_files()
+        utils.upload_dataset(self, benchmark_files, remote_subdirs)
         self._cleanup()
 
+
     def _make_benchmark_files(self):
+        print(f"[{self}] Staging dataset in '{self.root_dir}'..")
+        if self.format.startswith('tfrecord'):
+            img_list, label_list = self._make_record_files()
+        else:
+            img_list, label_list = self._make_jpg_files()
+        return img_list, label_list
+    
+
+    def _make_record_files(self):
+        tfr_list = []
         for file_index in range(self.num_files):
             print("[{}] Generating TFRecord file {} of {}..".format(self, file_index + 1, self.num_files))
-            tf_filename = os.path.join(self.root_dir, '{}-{}.tfrecord'.format(self.name, str(file_index)))
-            self._build_record_file(tf_filename)
+            tfr_filename = os.path.join(self.root_dir, '{}-{}.tfrecord'.format(self.name, str(file_index)))
+            tfr_list.append(tfr_filename)
 
-    def _build_record_file(self, filename, verbose=False):
-        """Build a TFRecord encoded file of TF protobuf Example objects.
+            with tf.io.TFRecordWriter(tfr_filename) as f:
+                for _ in tqdm.tqdm(range(self.num_records), disable=not self.verbose):
+                    arr, label = self._gen_sample()
+                    if self.format.endswith('raw'):
+                        BenchmarkDataset._write_image_raw(f, arr, label)
+                    else:
+                        img_bytes = self._encode_image(arr, format='JPEG')
+                        BenchmarkDataset._write_image_bytes(f, img_bytes, label)
 
-        Each object is a labeled numpy array. Each example has two field - a single int64 'label'
-        field and a single bytes list field, containing a serialized flattened numpy array.
+        return tfr_list, None
+    
 
-        Each generated numpy array is a multidimensional normal with
-        the specified dimension. The normal distribution is class specific, each class
-        has a different mean for the distribution, so it should be possible to learn
-        a multiclass classifier on this data. Class means are determnistic - so multiple
-        calls to this function with the same number of classes will produce samples drawn
-        from the same distribution for each class.
+    def _make_jpg_files(self):
+        img_list, label_list = [], []
+        for c in range(self.num_classes):
+            os.makedirs(os.path.join(self.root_dir, str(c)), exist_ok=True)
+        for _ in tqdm.tqdm(range(self.num_files), disable=not self.verbose):
+            arr, label = self._gen_sample()
+            img_bytes = self._encode_image(arr, format='JPEG')
+            img_filename = os.path.join(self.root_dir, str(label), 'sample-%s.jpg' % shortuuid.uuid())
+            with open(img_filename, 'wb') as f: 
+                f.write(img_bytes)
+            img_list.append(img_filename)
+            label_list.append(label)
+        return img_list, label_list
+    
+    
+    @staticmethod
+    def _encode_image(arr, format):
+        """
+        Encode an image from a NumPy array and return it as a byte array.
 
         Args:
-            filename (str): the file to write to.
+            arr (numpy.ndarray): The NumPy array representing the image.
+            format (str): The image format (e.g., 'JPEG', 'PNG').
+
+        Returns:
+            bytes: A byte array containing the encoded image.
         """
+        img_byte_arr = io.BytesIO()
+        img = pil_image.fromarray(arr)
+        img.save(img_byte_arr, format=format, subsampling=0, quality=100)
+        return img_byte_arr.getvalue()
+    
+    
+    def _gen_sample(self):
+        """
+        Generate a random sample.
 
-        with tf.io.TFRecordWriter(filename) as f:
-            for i in tqdm.tqdm(range(self.num_records), disable=not verbose):
-                label = i % self.num_classes
-                loc = 255 * (label + 1) / (self.num_classes + 1)
-                arr = np.random.normal(loc=loc, scale=2, size=self.dimension)
-                arr = np.clip(arr, 0, 255).astype(np.uint8)
-                BenchmarkDataset._write_image_raw(f, arr, label)
-
-    def _upload_to_s3(self):
-        print("[{}] Uploading dataset to '{}'..".format(self, self.s3_uri))
-
-        futures = []
-        uploaded_file_index = 0
-        with tqdm.tqdm(total=self.num_files*self.num_copies) as pbar:
-            with cf.ProcessPoolExecutor(2 * os.cpu_count()) as executor:
-                for file_index in range(self.num_files):
-                    for copy_index in range(self.num_copies):
-                        local_file = os.path.join(self.root_dir, '{}-{}.tfrecord'.format(self.name, str(file_index)))
-                        remote_key = '{}/{}/file_{}.tfrecord'.format(self.prefix, self.name, str(uploaded_file_index).zfill(6))
-                        futures.append(executor.submit(utils.upload_file, self.bucket_name, local_file, remote_key))
-                        uploaded_file_index += 1
-
-                for f in cf.as_completed(futures):
-                    try:
-                        _ = f.result()
-                        pbar.update(1)
-                    except Exception as e:
-                        print(e)
+        Returns:
+            tuple: A tuple containing:
+                - numpy.ndarray: The generated data sample.
+                - int: The label associated with the sample.
+        """
+        label = random.randrange(self.num_classes)
+        loc = 255 * (label + 1) / (self.num_classes + 1)
+        arr = np.random.normal(loc=loc, scale=2, size=self.dimension)
+        arr = np.clip(arr, 0, 255).astype(np.uint8)
+        return arr, label
+    
 
     def _cleanup(self):
         shutil.rmtree(self.root_dir)
+
+
+if __name__ == '__main__':
+
+    region = 'us-west-2'
+
+    dataset = SyntheticBenchmarkDataset(
+        name='test2',
+        format='tfrecord/jpg',
+        bucket=f'sagemaker-benchmark-{region}-242711262407',
+        prefix='datasets/synth-test',
+        region=region,
+        dimension=(288, 288, 3),
+        num_records=1000,
+        num_files=10,
+        num_copies=1,
+        num_classes=4
+    )
+
+    dataset.build()

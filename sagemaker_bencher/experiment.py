@@ -169,7 +169,7 @@ class Experiment:
 
     def get_dataset(self, dataset_name, dataset_cfg):
         dataset_def = dataset_cfg[dataset_name].copy()
-        dataset_type = dataset_def.pop('type')
+        dataset_type = dataset_def.get('type')
         if dataset_type == 'synthetic':
             return SyntheticBenchmarkDataset(dataset_name, region=self.region, **dataset_def)
         elif dataset_type == 'caltech':
@@ -322,7 +322,7 @@ class Experiment:
         job_time = self._wait_and_finalize_job(trial, job_name, artifact_prefix)
         return f"<-- Completed job: '{job_name}' (in {job_time} secs).."
 
-    def start(self):
+    def start(self, bootstrap=False):
         if self.parallelism > 0:
             executor = concurrent.futures.ProcessPoolExecutor(max_workers=self.parallelism)
         else:
@@ -333,6 +333,9 @@ class Experiment:
         for dataset in self.datasets.values():
             dataset.build()
 
+        if bootstrap: 
+            return
+        
         print(f"Creating/loading SM Experiment with name '{self.name}'..")
         self.load_sm_experiment(clean=self.clean)
 

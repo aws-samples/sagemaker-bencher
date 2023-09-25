@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT-0
 
 
-from .dataset import Dataset
+from sagemaker_bencher.dataset import Dataset
 
 
 class S3PrefixDataset(Dataset):

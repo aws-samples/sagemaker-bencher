@@ -4,22 +4,25 @@
 
 from abc import ABC, abstractmethod
 import tensorflow as tf
-import sagemaker_bencher.utils as utils
+
+from sagemaker_bencher import utils
 
 
 class Dataset(ABC):
-    def __init__(self, name, format=None, bucket=None, prefix=None, region=None):
-        """Base constructor for BenchmarkDataset.
+    def __init__(self, name, format=None, type=None, bucket=None, prefix=None, region=None):
+        """Base constructor for Dataset.
 
         Args:
             name (str): The name of the dataset
             format (str): (optional) The format of the dataset (e.g. 'jpg', 'tfrecord')
+            type (str): (optional) The type of the dataset (e.g. 'caltech', 'synthetic')
             bucket (str): (optional) An S3 bucket to store the dataset in
             prefix (str): (optional) An S3 prefix directory to store dataset objects in, within the bucket
             region (str): (optional) Region to place/use dataset from
         """
         self.name = name
         self.format = format
+        self.type = type
         self.bucket_name = bucket or utils.get_bucket(region=region)
         self.prefix = prefix or 'datasets'
 
@@ -50,15 +53,9 @@ class Dataset(ABC):
 
 
 class BenchmarkDataset(Dataset):
-    def __init__(self, name, format, **kw):
-        """Base constructor for BenchmarkDataset.
-
-        Args:
-            name (str): The name of the dataset
-            format (str): The format of the dataset (e.g. 'jpg', 'tfrecord')
-            **kw: Other arguments of the Dataset class
-        """
-        super().__init__(name, format, **kw)
+    def __init__(self, name, **kw):
+        """Base constructor for BenchmarkDataset."""
+        super().__init__(name, **kw)
 
     @staticmethod
     def _bytes_feature(value):
