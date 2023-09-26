@@ -73,7 +73,7 @@ class Experiment:
         self.role = role
         self.region = region
         self.output_prefix = output_prefix
-        self.bucket = bucket or utils.get_bucket(region=region)
+        self.bucket = utils.get_bucket(bucket=bucket, region=region)
         self.description = description
         self.parallelism = parallelism
         self.repeat = repeat

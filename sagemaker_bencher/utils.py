@@ -42,8 +42,9 @@ def get_bucket(bucket=None, region='eu-central-1', create_if_needed=True):
     """Return a bucket (create if needed) for storing SageMaker benchmarking data."""
     boto_session = get_boto3_session()
     s3 = boto_session.resource('s3')
-    account = boto_session.client('sts').get_caller_identity()['Account']
-    bucket = bucket or 'sagemaker-benchmark-{}-{}'.format(region, account)
+    if bucket is None:
+        account = boto_session.client('sts').get_caller_identity()['Account']
+        bucket = 'sagemaker-benchmark-{}-{}'.format(region, account)
 
     if not bucket_exists(bucket) and create_if_needed:
         print("Creating new bucket '{}' in region '{}'..".format(bucket, region))
@@ -51,7 +52,7 @@ def get_bucket(bucket=None, region='eu-central-1', create_if_needed=True):
             s3.create_bucket(Bucket=bucket)
         else:
             s3.create_bucket(Bucket=bucket, CreateBucketConfiguration={'LocationConstraint': region})
-        time.sleep(3)
+        time.sleep(10)
 
     return bucket
 

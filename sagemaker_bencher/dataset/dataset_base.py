@@ -23,7 +23,8 @@ class Dataset(ABC):
         self.name = name
         self.format = format
         self.type = type
-        self.bucket_name = bucket or utils.get_bucket(region=region)
+        self.bucket_name = bucket
+        self.region = region
         self.prefix = prefix or 'datasets'
 
     @abstractmethod
@@ -47,9 +48,13 @@ class Dataset(ABC):
     def _exists(self):
         s3 = utils.get_s3_resource()
         bucket = s3.Bucket(self.bucket_name)
-        for _ in bucket.objects.filter(Prefix=self.s3_path.lstrip('/')):
-            return True
-        return False
+        try:
+            for _ in bucket.objects.filter(Prefix=self.s3_path.lstrip('/')):
+                return True
+            return False
+        except Exception as e:
+            print(e)
+            return False
 
 
 class BenchmarkDataset(Dataset):

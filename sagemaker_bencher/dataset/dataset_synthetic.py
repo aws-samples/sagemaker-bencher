@@ -71,11 +71,15 @@ class SyntheticBenchmarkDataset(BenchmarkDataset):
         Args:
             overwrite (bool): If true will overwrite the dataset if it exists already.
         """
+        
+        self.bucket_name = utils.get_bucket(bucket=self.bucket_name, region=self.region)
+        
         if self._exists() and not overwrite:
             print(f"Dataset '{self.name}' found on '{self.s3_uri}'. Skipping build..")
             return
         else:
             print(f"Building dataset '{self.name}'..")
+            
         self.root_dir = tempfile.mkdtemp() # tempfile.mkdtemp(prefix=self.name + '-', dir='test-build')
         benchmark_files, remote_subdirs = self._make_benchmark_files()
         utils.upload_dataset(self, benchmark_files, remote_subdirs)

@@ -66,11 +66,15 @@ class CaltechBenchmarkDataset(BenchmarkDataset):
         Args:
             overwrite (bool): If true will overwrite the dataset if it exists already.
         """
+        
+        self.bucket_name = utils.get_bucket(bucket=self.bucket_name, region=self.region)
+        
         if self._exists() and not overwrite:
             print(f"Dataset '{self.name}' found on '{self.s3_uri}'. Skipping build..")
             return
         else:
             print(f"Building dataset '{self.name}'..")
+        
         self.root_dir = tempfile.mkdtemp()
         self._download_and_extract_from_source(untar=True, source_file=source_file)
         img_list, label_list = self._parse_dataset(file_extensions=['.jpg'])
