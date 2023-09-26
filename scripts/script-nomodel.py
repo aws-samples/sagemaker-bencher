@@ -7,10 +7,20 @@ import argparse
 import time
 import random
 
+import tensorflow as tf
+from sagemaker_tensorflow import PipeModeDataset
+
 from smexperiments.tracker import Tracker
 
 CHANNEL_NAME = 'train'
 DEBUG = True
+
+class TFModel:
+    def model(epoch, computation_time):
+        time.sleep(computation_time)
+
+    def compute(self, computation_time):
+        tf.function(self.model)(computation_time)
 
 
 def debug(message):
@@ -51,6 +61,7 @@ def _parse_args():
     parser.add_argument('--input_dim', type=int, default=224)
     parser.add_argument('--cache', type=none_or_str, default=None)
     parser.add_argument('--shuffle', type=str_bool, default=False)
+    parser.add_argument('--compute_time', type=float, default=0)
    
     # model directory: we will use the default set by SageMaker, /opt/ml/model
     parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_MODEL_DIR'))
@@ -64,13 +75,10 @@ def _parse_args():
     return parser.parse_known_args()
 
 
-def _build_tf_pipeline(config):
+def _build_tf_dataloader(config):
     
     t_stats = {}
     t_import_framework = time.perf_counter()
-    
-    import tensorflow as tf
-    from sagemaker_tensorflow import PipeModeDataset
     
     t_stats['t_import_framework'] = time.perf_counter() - t_import_framework
 
@@ -191,6 +199,11 @@ def _build_tf_pipeline(config):
     return ds, t_stats
 
 
+def _build_tf_model():
+    model = TFModel()
+    return model
+
+
 if __name__ == "__main__":
 
     args, unknown = _parse_args()
@@ -201,21 +214,23 @@ if __name__ == "__main__":
     tracker = Tracker.load()
 
     if args.framework == 'tf':
-        build_pipe_fn = _build_tf_pipeline
+        dataloader, t_stats = _build_tf_dataloader(config=args)
+        model = _build_tf_model()
     else:
         raise NotImplementedError("Not implemented for '%s'.." % args.framework)
 
-    pipe, t_stats = build_pipe_fn(config=args)
-    
     img_tot_list = []
     ep_times = []
     t_train_start = t_epoch_start = time.perf_counter()
     for ep in range(args.epochs):
         img_tot = 0
-        for it, (images, labels) in enumerate(pipe, 1):
+        for it, (images, labels) in enumerate(dataloader, 1):
             # do training step
             batch_size = images.shape[0]
             img_tot += batch_size
+            if args.compute_time > 0:
+                model.compute(args.compute_time)
+
         img_tot_list.append(img_tot)
         ep_times.append(time.perf_counter() - t_epoch_start)
         t_epoch_start = time.perf_counter()

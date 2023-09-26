@@ -82,7 +82,7 @@ def _parse_args():
     return parser.parse_known_args()
 
 
-def _build_tf_pipeline(config):
+def _build_tf_dataloader(config):
 
     t_stats = {}
     t_import_framework = time.perf_counter()
@@ -206,7 +206,7 @@ def _build_tf_pipeline(config):
     return ds, t_stats
 
 
-def build_model(backbone_model, num_classes, input_shape=(224, 224, 3), compiled=True):
+def _build_tf_model(backbone_model, num_classes, input_shape=(224, 224, 3), compiled=True):
 
     backbone_fn, _ = Classifiers.get(backbone_model)
         
@@ -233,21 +233,18 @@ if __name__ == "__main__":
     tracker = Tracker.load()
 
     if args.framework == 'tf':
-        build_pipe_fn = _build_tf_pipeline
+        dataloader, t_stats = _build_tf_dataloader(config=args)
     else:
         raise NotImplementedError("Not implemented for '%s'.." % args.framework)
-
-    pipe, t_stats = build_pipe_fn(config=args)
     
     t_build_model = time.perf_counter()
-
-    model = build_model(args.backbone_model, args.num_classes, input_shape=(args.input_dim, args.input_dim, 3), compiled=True)
+    model = _build_tf_model(args.backbone_model, args.num_classes, input_shape=(args.input_dim, args.input_dim, 3), compiled=True)
     t_stats['t_build_model'] = time.perf_counter() - t_build_model
     
     t_train_start = time.perf_counter()
     time_callback = TimeHistory()
     
-    model.fit(pipe, epochs=args.epochs, callbacks=[time_callback])
+    model.fit(dataloader, epochs=args.epochs, callbacks=[time_callback])
 
     img_tot = args.num_samples * args.epochs
     t_train_tot = time.perf_counter() - t_train_start
