@@ -8,14 +8,14 @@ import time
 import random
 
 import tensorflow as tf
-from sagemaker_tensorflow import PipeModeDataset
-
-from smexperiments.tracker import Tracker
 
 CHANNEL_NAME = 'train'
 DEBUG = True
 
-class TFModel:
+
+class TFModelMock:
+    '''This is a mock of TF model to emulate a computation of a training step'''
+    
     def model(epoch, computation_time):
         time.sleep(computation_time)
 
@@ -23,11 +23,23 @@ class TFModel:
         tf.function(self.model)(computation_time)
 
 
+class TimeHistory(tf.keras.callbacks.Callback):
+    def on_train_begin(self, logs={}):
+        self.times = []
+
+    def on_epoch_begin(self, epoch, logs=None):
+        self.epoch_time_start = time.perf_counter()
+
+    def on_epoch_end(self, epoch, logs=None):
+        self.times.append(time.perf_counter() - self.epoch_time_start)
+
+
 def debug(message):
     if DEBUG:
         print('[DEBUG] ' + message)
 
-def _parse_args():
+
+def parse_and_validate_args():
     
     def none_or_int(value):
         if str(value).upper() == 'NONE':
@@ -49,8 +61,7 @@ def _parse_args():
     
     parser = argparse.ArgumentParser()
 
-    # hyperparameters sent by the client are passed as command-line arguments to the script
-    parser.add_argument('--epochs', type=int, default=1)
+    ### Parameters that define dataloader part 
     parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--prefetch_first', type=str_bool, default=False)
     parser.add_argument('--prefetch_size', type=none_or_int, default=None)
@@ -59,29 +70,33 @@ def _parse_args():
     parser.add_argument('--num_parallel_reads', type=none_or_int, default=None)
     parser.add_argument('--private_pool', type=none_or_int, default=None)
     parser.add_argument('--input_dim', type=int, default=224)
-    parser.add_argument('--cache', type=none_or_str, default=None)
     parser.add_argument('--shuffle', type=str_bool, default=False)
-    parser.add_argument('--compute_time', type=float, default=0)
+    parser.add_argument('--cache', type=none_or_str, default=None)
+    
+    ### Parameters that define computation part 
+    parser.add_argument('--epochs', type=int, default=1)
+    parser.add_argument('--compute_time', type=none_or_int, default=None) # in MS
+    parser.add_argument('--backbone_model', type=none_or_str, default=None)
    
-    # model directory: we will use the default set by SageMaker, /opt/ml/model
-    parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_MODEL_DIR'))
-    parser.add_argument('--num_gpus', type=str, default=os.environ.get('SM_NUM_GPUS'))
-    parser.add_argument('--framework', type=str, default=os.environ.get('IO_FRAMEWORK'))
+    ### Parameters that define some storage and dataset details for benchmarking 
     parser.add_argument('--input_channel', type=str, default=os.environ.get(f'SM_CHANNEL_{CHANNEL_NAME.upper()}'))
-    parser.add_argument('--input_mode', type=str, default=os.environ.get(f'IO_INPUT_MODE_CHANNEL_{CHANNEL_NAME.upper()}'))
-    parser.add_argument('--input_format', type=none_or_str, default=os.environ.get(f'IO_INPUT_FORMAT_CHANNEL_{CHANNEL_NAME.upper()}'))
-    parser.add_argument('--s3_data_source', type=str, default=os.environ.get(f'IO_DATA_SOURCE_CHANNEL_{CHANNEL_NAME.upper()}'))
+    parser.add_argument('--input_mode', type=str, default=os.environ.get(f'INPUT_MODE_CHANNEL_{CHANNEL_NAME.upper()}'))
+    parser.add_argument('--dataset_format', type=none_or_str, default=os.environ.get(f'DATASET_FORMAT_CHANNEL_{CHANNEL_NAME.upper()}'))
+    parser.add_argument('--dataset_s3_uri', type=str, default=os.environ.get(f'DATASET_S3_URI_CHANNEL_{CHANNEL_NAME.upper()}'))
+    parser.add_argument('--dataset_num_classes', type=none_or_int, default=os.environ.get(f'DATASET_NUM_CLASSES_CHANNEL_{CHANNEL_NAME.upper()}', 2))
+    parser.add_argument('--dataset_num_samples', type=none_or_int, default=os.environ.get(f'DATASET_NUM_SAMPLES_CHANNEL_{CHANNEL_NAME.upper()}', 0))
+
+    args, _ = parser.parse_known_args()
+
+    if args.compute_time is not None and args.backbone_model is not None:
+        raise ValueError("Compute time and backbone model can't be set together..")
     
-    return parser.parse_known_args()
+    return args
 
 
-def _build_tf_dataloader(config):
-    
-    t_stats = {}
-    t_import_framework = time.perf_counter()
-    
-    t_stats['t_import_framework'] = time.perf_counter() - t_import_framework
+def build_dataloader(config):
 
+    # Define signature of TFRecord samples in raw format
     features_raw = {
         'image': tf.io.FixedLenFeature([], tf.string),
         'label': tf.io.FixedLenFeature([], tf.int64),
@@ -89,10 +104,12 @@ def _build_tf_dataloader(config):
         'width': tf.io.FixedLenFeature([], tf.int64),
         'depth': tf.io.FixedLenFeature([], tf.int64)}
 
+    # Define signature of TFRecord samples in JPG format
     features_jpg = {
         'image': tf.io.FixedLenFeature([], tf.string),
         'label': tf.io.FixedLenFeature([], tf.int64)}
 
+    # Define parsing and preproc function for TFRecord samples in raw format
     def parse_record_raw(record):
         parsed = tf.io.parse_single_example(record, features_raw)
         shape = [parsed['height'], parsed['width'], parsed['depth']]
@@ -102,6 +119,7 @@ def _build_tf_dataloader(config):
         label = parsed['label'] - 1    # Need labels in [0, MAX) range
         return image, label
 
+    # Define parsing and preproc function for TFRecord samples in JPG format
     def parse_record_jpg(record):
         parsed = tf.io.parse_single_example(record, features_jpg)
         image = tf.io.decode_jpeg(parsed['image'], channels=3)
@@ -109,12 +127,12 @@ def _build_tf_dataloader(config):
         label = parsed['label'] - 1    # Need labels in [0, MAX) range
         return image, label
 
+    # Define parsing and preproc function for JPG samples
     def parse_file_jpg(file):
         image, label = read_file_jpg(file)
         image, label = preproc_file_jpg(image, label)
         return image, label
 
-# ==== FOR CACHING ====
     def read_file_jpg(file):
         image = tf.io.read_file(file)
         label = tf.strings.split(file, sep=os.path.sep)[-2]
@@ -125,42 +143,44 @@ def _build_tf_dataloader(config):
         image = tf.io.decode_jpeg(image, channels=3)
         image = tf.image.resize(image, (config.input_dim, config.input_dim))
         return image, label
-# ==== END FOR CACHING ====
 
-    if config.input_format == 'jpg':
+    # Select appropriate parsing function and search expression for either JPG- or TFRecord-datasets
+    if config.dataset_format == 'jpg':
         search_ex = '/**/*.jpg' # folder structure: './<class_id>/image.jpg'
         parse_fn = parse_file_jpg
-    elif config.input_format == 'tfrecord/jpg':
+    elif config.dataset_format == 'tfrecord/jpg':
         search_ex = '/*.tfrecord' # folder structure: './data.tfrecord'
         parse_fn = parse_record_jpg
-    elif config.input_format == 'tfrecord/raw':
+    elif config.dataset_format == 'tfrecord/raw':
         search_ex = '/*.tfrecord' # folder structure: './data.tfrecord'
         parse_fn = parse_record_raw
+    else:
+        raise NotImplementedError("Unknown dataset format '%s'.." % config.dataset_format)
 
+    # Start building a dataloader pipeline
     if config.input_mode == 'pipe':
-        if config.input_format.startswith('tfrecord'):
+        from sagemaker_tensorflow import PipeModeDataset
+        if config.dataset_format.startswith('tfrecord'):
             ds = PipeModeDataset(channel=CHANNEL_NAME, record_format='TFRecord', benchmark=True)
         else:
             raise NotImplementedError("Pipe-mode only support TFRecord-input!..")
     elif config.input_mode in {'file', 'ffm', 'fsx'}:
         files = tf.io.gfile.glob(config.input_channel + search_ex)
-        if config.input_format.startswith('tfrecord'):
+        if config.dataset_format.startswith('tfrecord'):
             ds = tf.data.TFRecordDataset(files, num_parallel_reads=config.num_parallel_reads)
-        elif config.input_format == 'jpg':
+        elif config.dataset_format == 'jpg':
             ds = tf.data.Dataset.from_tensor_slices(files)
         else:
             raise NotImplementedError("File- and FFM-modes only support TFRecords- or JPG-inputs!..")
     elif config.input_mode == 's3tf':
-        if config.input_format.startswith('tfrecord'):
-            files = tf.io.gfile.glob(config.s3_data_source + search_ex)
+        if config.dataset_format.startswith('tfrecord'):
+            files = tf.io.gfile.glob(config.dataset_s3_uri + search_ex)
             ds = tf.data.TFRecordDataset(files, num_parallel_reads=config.num_parallel_reads)
         else:
             raise NotImplementedError("S3TF-mode only support TFRecord-input!..")
     else:
         raise NotImplementedError("Not implemented for '%s'.." % args.input_mode)
         
-
-
     if config.shuffle:
         debug("Shuffling is ON!..")
         random.shuffle(files)
@@ -169,7 +189,7 @@ def _build_tf_dataloader(config):
         debug("Prefetch first elements is ON!..")
         ds = ds.prefetch(-1)
 
-    if config.cache and config.input_format == 'jpg':
+    if config.cache and config.dataset_format == 'jpg':
         debug('Caching training data to %s!..' % config.cache)
         ds = ds.map(read_file_jpg, num_parallel_calls=config.num_parallel_calls)
         ds = ds.cache('' if config.cache.upper() == 'MEM' else config.cache)
@@ -193,58 +213,114 @@ def _build_tf_dataloader(config):
         options = tf.data.Options()
         options.experimental_threading.private_threadpool_size = config.private_pool
         ds = ds.with_options(options)
-    
-    t_stats['t_build_pipe'] = time.perf_counter() - t_import_framework
 
-    return ds, t_stats
+    return ds
 
 
-def _build_tf_model():
-    model = TFModel()
+def build_model(cfg):
+    if cfg.compute_time is not None:
+        model = _build_model_mock(cfg)
+    elif cfg.backbone_model is not None:
+        model = _build_model_backbone(cfg)
     return model
 
 
-if __name__ == "__main__":
+def train_model(model, cfg):
+    if cfg.compute_time is not None: 
+        stats = _train_model_mock(model, cfg)
+    elif cfg.backbone_model is not None:
+        stats = _train_model_backbone(model, cfg)
+    return stats
 
-    args, unknown = _parse_args()
 
-    debug("Env args: \n" + json.dumps(vars(args)))
+def _build_model_mock(cfg):
+    model = TFModelMock()
+    return model
+
+
+def _build_model_backbone(cfg):
+    from classification_models.tfkeras import Classifiers
+
+    backbone_fn, _ = Classifiers.get(cfg.backbone_model)
+    input_shape = (cfg.input_dim, cfg.input_dim, 3)
+
+    base_model = backbone_fn(input_shape=input_shape, weights='imagenet', include_top=False)
+    x = tf.keras.layers.GlobalAveragePooling2D()(base_model.output)
+    output = tf.keras.layers.Dense(cfg.dataset_num_classes, activation='softmax')(x)
+    model = tf.keras.Model(inputs=[base_model.input], outputs=[output])
+    model.compile(optimizer='Adam', loss='sparse_categorical_crossentropy')
+    return model
     
-    print("Starting benchmark for input mode '%s'.." % args.input_mode)
-    tracker = Tracker.load()
 
-    if args.framework == 'tf':
-        dataloader, t_stats = _build_tf_dataloader(config=args)
-        model = _build_tf_model()
-    else:
-        raise NotImplementedError("Not implemented for '%s'.." % args.framework)
-
-    img_tot_list = []
-    ep_times = []
+def _train_model_mock(model, cfg):
+    t_stats, img_tot_list, ep_times = {}, [], []
     t_train_start = t_epoch_start = time.perf_counter()
-    for ep in range(args.epochs):
+
+    for epoch in range(cfg.epochs):
         img_tot = 0
-        for it, (images, labels) in enumerate(dataloader, 1):
+        for iteration, (images, labels) in enumerate(dataloader, 1):
             # do training step
             batch_size = images.shape[0]
             img_tot += batch_size
-            if args.compute_time > 0:
-                model.compute(args.compute_time)
+            if cfg.compute_time > 0:
+                model.compute(cfg.compute_time/1000) # ms --> s
 
+        # log metrics
         img_tot_list.append(img_tot)
         ep_times.append(time.perf_counter() - t_epoch_start)
         t_epoch_start = time.perf_counter()
 
+    # log metrics
     t_train_tot = time.perf_counter() - t_train_start
-    
     t_stats['t_training_exact'] = t_train_tot
     t_stats['img_sec_ave_tot'] = sum(img_tot_list) / t_train_tot
     t_stats['img_tot'] = sum(img_tot_list)
     t_stats.update({f't_epoch_{ep}': t for ep, t in enumerate(ep_times, 1)})
-    tracker.log_parameters(t_stats)
-    
-    print(json.dumps(t_stats))
+    return t_stats
 
+
+def _train_model_backbone(model, cfg):
+    t_stats = {}
+    time_callback = TimeHistory()
+    t_train_start = time.perf_counter()
+
+    model.fit(dataloader, epochs=cfg.epochs, callbacks=[time_callback])
+
+    img_tot = cfg.dataset_num_samples * cfg.epochs
+    t_train_tot = time.perf_counter() - t_train_start
+    t_stats['t_training_exact'] = t_train_tot
+    t_stats['img_sec_ave_tot'] = img_tot / t_train_tot
+    t_stats['img_tot'] = img_tot
+    t_stats.update({f't_epoch_{ep}': t for ep, t in enumerate(time_callback.times, 1)})
+    return t_stats
+
+
+if __name__ == "__main__":
+
+    from smexperiments.tracker import Tracker
+
+    # Step 1: Parse the parameters sent by the SageMaker client to the script
+    args = parse_and_validate_args()
+
+    print("Benchmarking params:\n" + json.dumps(vars(args), indent=2))
+
+    # Step 2: Load SageMaker Experiment tracker to log benchmark metrics
+    tracker = Tracker.load()
+    
+    # Step 3: Build dataloader
+    dataloader = build_dataloader(args)
+
+    # Step 4: Build model
+    model = build_model(args)
+
+    # Step 5: Do training run
+    metrics = train_model(model, args)
+    
+    print("All logged metrics:\n" + json.dumps(metrics, indent=2))
+    
+    # Step 6: Flush logged metrics to SageMaker Experiments
+    tracker.log_parameters(metrics)
+    
     time.sleep(5)
     tracker.close()
     time.sleep(5)

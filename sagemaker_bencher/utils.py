@@ -134,7 +134,9 @@ def get_boto3_session(region=None):
 
 @lru_cache()
 def get_s3_resource(region=None):
-    config = botocore.config.Config(max_pool_connections=os.cpu_count()*2)
+    config = botocore.config.Config(
+        max_pool_connections=os.cpu_count()*2,
+        retries={'max_attempts': 100, 'mode': 'adaptive'})
     return get_boto3_session().resource('s3', config=config)
     
 

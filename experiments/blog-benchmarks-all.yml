@@ -30,7 +30,7 @@ fsx:
 # --- TRIAL DEFINITIONS
 # Default values for trials (if not overriden by specific trial)
 base_trial:
-  script: script-model.py
+  script: benchmark-tensorflow.py
   source_dir: scripts
   framework: tf
   framework_version: '2.4.1'

@@ -18,13 +18,15 @@ datasets:
   Synth-tfr-jpg-100MB-a-1MB:
     type: s3prefix
     format: tfrecord/jpg
-    bucket: sagemaker-benchmark-us-west-2-XXXXXXXXXXXX
+    #bucket: sagemaker-benchmark-us-west-2-XXXXXXXXXXXX
+    bucket: sagemaker-benchmark-us-west-2-242711262407
     prefix: 'datasets/synthetic'
 
   Synth-tfr-jpg-1GB-a-100MB:
     type: s3prefix
     format: tfrecord/jpg
-    bucket: sagemaker-benchmark-us-west-2-XXXXXXXXXXXX
+    #bucket: sagemaker-benchmark-us-west-2-XXXXXXXXXXXX
+    bucket: sagemaker-benchmark-us-west-2-242711262407
     prefix: 'datasets/synthetic'
 
 
@@ -41,11 +43,11 @@ fsx:
 # --- TRIAL DEFINITIONS
 # Default values for trials (if not overriden by specific trial)
 base_trial:
-  #script: script-nomodel.py
+  script: benchmark-tensorflow.py
   source_dir: scripts
   framework: tf
-  framework_version: '2.4.1'
-  py_version: py37
+  framework_version: '2.13'
+  py_version: py310
   volume_size: 225
   instance_type: ml.g4dn.8xlarge
   instance_count: 1
@@ -60,7 +62,6 @@ base_trial:
     epochs: 1
     batch_size: 32
     shuffle: False
-    backbone_model: resnet50
     input_dim: 300
     cache: None               # None, 'mem', or <path> for on-disk cache (e.g. 'tmp/cache')
     
@@ -70,42 +71,40 @@ trials:
 
 # --- NOMODEL tests ---
   nomodel-ffm:
-    script: script-nomodel.py
+    hyperparameters:
+      compute_time: 0
     inputs:
       train:
         dataset: Synth-tfr-jpg-100MB-a-1MB
         input_mode: ffm
 
   nomodel-file:
-    script: script-nomodel.py
+    hyperparameters:
+      compute_time: 0
     inputs:
       train:
         dataset: Synth-tfr-jpg-100MB-a-1MB
         input_mode: file
 
   nomodel-pipe:
-    script: script-nomodel.py
+    hyperparameters:
+      compute_time: 0
     inputs:
       train:
         dataset: Synth-tfr-jpg-100MB-a-1MB
         input_mode: pipe
 
   nomodel-fsx:
-    script: script-nomodel.py
+    hyperparameters:
+      compute_time: 0
     inputs:
       train:
         dataset: Synth-tfr-jpg-100MB-a-1MB
         input_mode: fsx
 
-  nomodel-s3tf:
-    script: script-nomodel.py
-    inputs:
-      train:
-        dataset: Synth-tfr-jpg-100MB-a-1MB
-        input_mode: s3tf
-
   nomodel-ffm-2:
-    script: script-nomodel.py
+    hyperparameters:
+      compute_time: 0
     inputs:
       train:
         dataset: Synth-tfr-jpg-1GB-a-100MB
@@ -113,42 +112,40 @@ trials:
 
 # --- MODEL tests ---
   model-ffm:
-    script: script-model.py
+    hyperparameters:
+      backbone_model: resnet18
     inputs:
       train:
         dataset: Synth-tfr-jpg-100MB-a-1MB
         input_mode: ffm
 
   model-file:
-    script: script-model.py
+    hyperparameters:
+      backbone_model: resnet18
     inputs:
       train:
         dataset: Synth-tfr-jpg-100MB-a-1MB
         input_mode: file
 
   model-pipe:
-    script: script-model.py
+    hyperparameters:
+      backbone_model: resnet18
     inputs:
       train:
         dataset: Synth-tfr-jpg-100MB-a-1MB
         input_mode: pipe
 
   model-fsx:
-    script: script-model.py
+    hyperparameters:
+      backbone_model: resnet18
     inputs:
       train:
         dataset: Synth-tfr-jpg-100MB-a-1MB
         input_mode: fsx
 
-  model-s3tf:
-    script: script-model.py
-    inputs:
-      train:
-        dataset: Synth-tfr-jpg-100MB-a-1MB
-        input_mode: s3tf
-
   model-ffm-2:
-    script: script-model.py
+    hyperparameters:
+      backbone_model: resnet18
     inputs:
       train:
         dataset: Synth-tfr-jpg-1GB-a-100MB

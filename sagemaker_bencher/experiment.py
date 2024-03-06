@@ -196,19 +196,19 @@ class Experiment:
     def _set_channel_inputs_and_params(self, trial, job_name):
         inputs = {}
         config_extra_vars = {}
-        env_vars = {'IO_FRAMEWORK': trial['framework']}
+        env_vars = {'ML_FRAMEWORK': trial['framework']}
         
         # Set up env vars and inputs for all channels
         for ch_name, ch_cfg in trial['inputs'].items():
             dataset = self.datasets[ch_cfg['dataset']]
-            env_vars[f'IO_INPUT_MODE_CHANNEL_{ch_name.upper()}'] =  ch_cfg['input_mode']
-            env_vars[f'IO_DATA_SOURCE_CHANNEL_{ch_name.upper()}'] =  dataset.s3_uri
+            env_vars[f'INPUT_MODE_CHANNEL_{ch_name.upper()}'] =  ch_cfg['input_mode']
+            env_vars[f'DATASET_S3_URI_CHANNEL_{ch_name.upper()}'] =  dataset.s3_uri
             if hasattr(dataset, 'format'):
-                env_vars[f'IO_INPUT_FORMAT_CHANNEL_{ch_name.upper()}'] =  str(getattr(dataset, 'format'))
+                env_vars[f'DATASET_FORMAT_CHANNEL_{ch_name.upper()}'] =  str(getattr(dataset, 'format'))
             if hasattr(dataset, 'num_classes'):
-                env_vars[f'IO_NUM_CLASSES_CHANNEL_{ch_name.upper()}'] =  str(getattr(dataset, 'num_classes'))
+                env_vars[f'DATASET_NUM_CLASSES_CHANNEL_{ch_name.upper()}'] =  str(getattr(dataset, 'num_classes'))
             if hasattr(dataset, 'num_samples'):
-                env_vars[f'IO_NUM_SAMPLES_CHANNEL_{ch_name.upper()}'] =  str(getattr(dataset, 'num_samples'))
+                env_vars[f'DATASET_NUM_SAMPLES_CHANNEL_{ch_name.upper()}'] =  str(getattr(dataset, 'num_samples'))
 
             if ch_cfg['input_mode'] in ('file', 'ffm', 'pipe'):
                 inputs[ch_name] = sagemaker.inputs.TrainingInput(
