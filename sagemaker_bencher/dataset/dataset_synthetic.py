@@ -11,8 +11,10 @@ import shortuuid
 
 import tqdm
 import numpy as np
-import tensorflow as tf
 from PIL import Image as pil_image
+
+import tensorflow as tf
+import webdataset as wds
 
 from sagemaker_bencher import utils
 from sagemaker_bencher.dataset import BenchmarkDataset
@@ -30,7 +32,7 @@ class SyntheticBenchmarkDataset(BenchmarkDataset):
     prefix.
     """
 
-    input_formats = {'tfrecord/raw', 'tfrecord/jpg', 'jpg'}
+    input_formats = {'tar/jpg', 'tfrecord/raw', 'tfrecord/jpg', 'jpg'}
 
     def __init__(self, name, format, type, bucket, prefix, region, dimension,
                  num_files, num_copies, num_classes, num_records=None):
@@ -90,10 +92,30 @@ class SyntheticBenchmarkDataset(BenchmarkDataset):
         print(f"[{self}] Staging dataset in '{self.root_dir}'..")
         if self.format.startswith('tfrecord'):
             img_list, label_list = self._make_record_files()
+        elif self.format.startswith('tar'):
+            img_list, label_list = self._make_tar_files()
         else:
             img_list, label_list = self._make_jpg_files()
         return img_list, label_list
     
+
+    def _make_tar_files(self):
+        tar_list = []
+        for file_index in range(self.num_files):
+            print("[{}] Generating TAR file {} of {}..".format(self, file_index + 1, self.num_files))
+            tar_filename = os.path.join(self.root_dir, '{}-{:06d}.tar'.format(self.name, file_index))
+            tar_list.append(tar_filename)
+
+            with wds.TarWriter(tar_filename) as f:
+                for _ in tqdm.tqdm(range(self.num_records), disable=not self.verbose):
+                    arr, label = self._gen_sample()
+                    img_bytes = self._encode_image(arr, format='JPEG')
+                    key = os.path.join(str(label), 'sample-%s' % shortuuid.uuid())
+                    sample = {"__key__": key, "jpg": img_bytes, "cls": label}
+                    f.write(sample)
+
+        return tar_list, None
+
 
     def _make_record_files(self):
         tfr_list = []
@@ -173,15 +195,16 @@ if __name__ == '__main__':
 
     dataset = SyntheticBenchmarkDataset(
         name='test2',
-        format='tfrecord/jpg',
-        bucket=f'sagemaker-benchmark-{region}-242711262407',
+        format='tar/jpg',
+        type='synthetic',
+        bucket=f'sagemaker-benchmark-{region}-XXXXXXXXXXX',
         prefix='datasets/synth-test',
         region=region,
         dimension=(288, 288, 3),
         num_records=1000,
         num_files=10,
-        num_copies=1,
+        num_copies=2,
         num_classes=4
     )
 
-    dataset.build()
+    dataset.build(overwrite=True)
