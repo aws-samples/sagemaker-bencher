@@ -10,3 +10,4 @@ requests
 Pillow
 gdown
 shortuuid
+webdataset
