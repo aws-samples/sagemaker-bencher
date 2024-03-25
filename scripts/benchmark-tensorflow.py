@@ -225,11 +225,11 @@ def build_model(cfg):
     return model
 
 
-def train_model(model, cfg):
+def train_model(model, dataloader, cfg):
     if cfg.compute_time is not None: 
-        stats = _train_model_mock(model, cfg)
+        stats = _train_model_mock(model, dataloader, cfg)
     elif cfg.backbone_model is not None:
-        stats = _train_model_backbone(model, cfg)
+        stats = _train_model_backbone(model, dataloader, cfg)
     return stats
 
 
@@ -252,7 +252,7 @@ def _build_model_backbone(cfg):
     return model
     
 
-def _train_model_mock(model, cfg):
+def _train_model_mock(model, dataloader, cfg):
     t_stats, img_tot_list, ep_times = {}, [], []
     t_train_start = t_epoch_start = time.perf_counter()
 
@@ -279,7 +279,7 @@ def _train_model_mock(model, cfg):
     return t_stats
 
 
-def _train_model_backbone(model, cfg):
+def _train_model_backbone(model, dataloader, cfg):
     t_stats = {}
     time_callback = TimeHistory()
     t_train_start = time.perf_counter()
@@ -314,7 +314,7 @@ if __name__ == "__main__":
     model = build_model(args)
 
     # Step 5: Do training run
-    metrics = train_model(model, args)
+    metrics = train_model(model, dataloader, args)
     
     print("All logged metrics:\n" + json.dumps(metrics, indent=2))
     
