@@ -81,6 +81,7 @@ class Experiment:
         self.fsx = fsx
         self.disable_profiler = disable_profiler
         self.clean = clean
+        self.local_mode = False
 
         self._init_trials(base_trial, trials)
         self._init_datasets(datasets)
@@ -231,6 +232,9 @@ class Experiment:
     def _wait_and_finalize_job(self, trial, job_name, artifact_prefix=None):
         '''Wait for job to complete and finilize the logs, if successful. Returns elapsed job time.'''
 
+        if self.local_mode:
+            return 'N/A'
+
         while True:
             job_desc = self.client.describe_training_job(TrainingJobName=job_name)
             job_status = job_desc['TrainingJobStatus'] 
@@ -292,24 +296,33 @@ class Experiment:
                 system_monitor_interval_millis=100,
                 framework_profile_params=FrameworkProfile())
         
+        if self.local_mode:
+            instance_type = 'local'
+            sm_session = sagemaker.local.LocalSession()
+            sm_session.config={'local': {'local_code': True}}
+        else:
+            instance_type = trial['instance_type']
+            sm_session = sagemaker.Session(sagemaker_client=self.client)
+        
         estimator_config = dict(
             entry_point=trial['script'],
             source_dir=trial['source_dir'],
             hyperparameters=hyperparams,
             role=role_arn,
-            framework_version=trial['framework_version'],
+            framework_version=trial.get('framework_version'),
             output_path=output_path,
             code_location=code_location,
-            py_version=trial['py_version'],
+            py_version=trial.get('py_version'),
+            image_uri=trial.get('image_uri'),
             instance_count=trial['instance_count'],
-            instance_type=trial['instance_type'],
+            instance_type=instance_type,
             volume_size=trial['volume_size'],
             max_run=trial['max_run'],
             environment=environment,
             disable_profiler=self.disable_profiler,
             debugger_hook_config=False,
             profiler_config=profiler_config,
-            sagemaker_session=sagemaker.Session(sagemaker_client=self.client))
+            sagemaker_session=sm_session)
 
         estimator_config.update(channel_params)   # Add any extra params (e.g. VPC settings if channels require VPC)
         inputs = inputs or None                   # Set explicitely to `None`, if no native SageMaker input modes are used
@@ -322,8 +335,11 @@ class Experiment:
         job_time = self._wait_and_finalize_job(trial, job_name, artifact_prefix)
         return f"<-- Completed job: '{job_name}' (in {job_time} secs).."
 
-    def start(self, bootstrap=False):
-        if self.parallelism > 0:
+    def start(self, bootstrap=False, local=False):
+
+        self.local_mode = local
+
+        if self.parallelism > 0 and not self.local_mode:
             executor = concurrent.futures.ProcessPoolExecutor(max_workers=self.parallelism)
         else:
             executor = SyncExecutor()
