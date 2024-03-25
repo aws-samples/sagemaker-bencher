@@ -206,3 +206,59 @@ Synth-jpg-50GB-a-100KB:
     num_copies: 50
     num_classes: 4
 
+# ================================= #
+
+Synth-wds-jpg-100MB-a-1MB:
+    type: synthetic
+    format: tar/jpg
+    bucket: null
+    prefix: 'datasets/synthetic'
+    dimension: [290, 290, 3]
+    num_records: 10
+    num_files: 10
+    num_copies: 10
+    num_classes: 4
+
+Synth-wds-jpg-1GB-a-100MB:
+    type: synthetic
+    format: tar/jpg
+    bucket: null
+    prefix: 'datasets/synthetic'
+    dimension: [290, 290, 3]
+    num_records: 1000
+    num_files: 1
+    num_copies: 10
+    num_classes: 4
+
+Synth-wds-jpg-10GB-a-100MB:
+    type: synthetic
+    format: tar/jpg
+    bucket: null
+    prefix: 'datasets/synthetic'
+    dimension: [290, 290, 3]
+    num_records: 1000
+    num_files: 10
+    num_copies: 10
+    num_classes: 4
+
+Synth-wds-jpg-25GB-a-100MB:
+    type: synthetic
+    format: tar/jpg
+    bucket: null
+    prefix: 'datasets/synthetic'
+    dimension: [290, 290, 3]
+    num_records: 1000
+    num_files: 10
+    num_copies: 25
+    num_classes: 4
+
+Synth-wds-jpg-50GB-a-100MB:
+    type: synthetic
+    format: tar/jpg
+    bucket: null
+    prefix: 'datasets/synthetic'
+    dimension: [290, 290, 3]
+    num_records: 1000
+    num_files: 10
+    num_copies: 50
+    num_classes: 4
