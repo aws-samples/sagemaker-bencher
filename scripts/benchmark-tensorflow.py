@@ -88,7 +88,7 @@ def parse_and_validate_args():
 
     args, _ = parser.parse_known_args()
 
-    if not bool(args.compute_time) ^ bool(args.backbone_model):
+    if not (args.compute_time is not None) ^ (args.backbone_model is not None):
         raise ValueError("Either compute time or backbone model alias must be set..")
     
     return args
