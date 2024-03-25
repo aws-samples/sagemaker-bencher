@@ -53,8 +53,8 @@ class SyntheticBenchmarkDataset(BenchmarkDataset):
         """
 
         if format not in self.input_formats:
-            raise NotImplementedError("Implemented input formats are '{}', but '{}' requested!..").format(
-                self.input_formats, format)
+            raise NotImplementedError("Implemented input formats are '{}', but '{}' requested!..".format(
+                self.input_formats, format))
         
         self.dimension = dimension
         self.num_records = num_records
