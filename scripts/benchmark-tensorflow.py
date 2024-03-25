@@ -88,8 +88,8 @@ def parse_and_validate_args():
 
     args, _ = parser.parse_known_args()
 
-    if args.compute_time is not None and args.backbone_model is not None:
-        raise ValueError("Compute time and backbone model can't be set together..")
+    if not bool(args.compute_time) ^ bool(args.backbone_model):
+        raise ValueError("Either compute time or backbone model alias must be set..")
     
     return args
 

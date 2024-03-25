@@ -22,10 +22,10 @@ def identity(x):
     return x
 
 
-class PTModelMock:
-    '''This is a mock of TF model to emulate a computation of a training step'''
-    def __init__(self):
-        pass
+class ModelMock:
+    '''Model mock to emulate a computation of a training step'''
+    def compute(self, computation_time):
+        return time.sleep(computation_time)
 
 
 class MapDataset(torch.utils.data.Dataset):
@@ -49,7 +49,6 @@ class MapDataset(torch.utils.data.Dataset):
         sample = self._transform(self._read(file))
         label = int(self._get_label(file)) - 1    # Labels in [0, MAX) range
         return sample, label
-
 
 
 def debug(message):
@@ -107,8 +106,8 @@ def parse_and_validate_args():
 
     args, _ = parser.parse_known_args()
 
-    if args.compute_time is not None and args.backbone_model is not None:
-        raise ValueError("Compute time and backbone model can't be set together..")
+    if not bool(args.compute_time) ^ bool(args.backbone_model):
+        raise ValueError("Either compute time or backbone model alias must be set..")
     
     return args
 
@@ -160,23 +159,26 @@ def build_dataloader(config):
 
 
 def build_model(cfg):
-    return None
+    if cfg.compute_time is not None:
+        model = _build_model_mock(cfg)
+    elif cfg.backbone_model is not None:
+        model = _build_model(cfg)
+    return model
 
+def _build_model_mock(cfg):
+    model = ModelMock()
+    return model
+
+def _build_model(cfg):
+    raise NotImplementedError("Not yet implemented..")
 
 def train_model(model, dataloader, cfg):
     if cfg.compute_time is not None: 
         stats = _train_model_mock(model, dataloader, cfg)
     elif cfg.backbone_model is not None:
-        stats = _train_model_backbone(model, dataloader, cfg)
-    else:
-        raise ValueError("Neither compute_time, nor backbone_model is set..")
+        stats = _train_model(model, dataloader, cfg)
     return stats
-
-
-def _train_model_backbone(model, dataloader, cfg):
-    raise NotImplementedError()
     
-
 def _train_model_mock(model, dataloader, cfg):
     t_stats, img_tot_list, ep_times = {}, [], []
     t_train_start = t_epoch_start = time.perf_counter()
@@ -188,8 +190,7 @@ def _train_model_mock(model, dataloader, cfg):
             batch_size = images.shape[0]
             img_tot += batch_size
             if cfg.compute_time > 0:
-                raise ValueError("Not yet implemented for 'compute_time' > 0..")
-                #model.compute(cfg.compute_time/1000) # ms --> s
+                model.compute(cfg.compute_time/1000) # ms --> s
 
         # log metrics
         img_tot_list.append(img_tot)
@@ -204,6 +205,9 @@ def _train_model_mock(model, dataloader, cfg):
     t_stats.update({f't_epoch_{ep}': t for ep, t in enumerate(ep_times, 1)})
     return t_stats
 
+def _train_model(model, dataloader, cfg):
+    raise NotImplementedError("Not yet implemented..")
+
 
 
 if __name__ == "__main__":
@@ -216,7 +220,7 @@ if __name__ == "__main__":
     print("Benchmarking params:\n" + json.dumps(vars(args), indent=2))
 
     # Step 2: Load SageMaker Experiment tracker to log benchmark metrics
-    #tracker = Tracker.load()
+    tracker = Tracker.load()
     
     # Step 3: Build dataloader
     dataloader = build_dataloader(args)
@@ -229,4 +233,9 @@ if __name__ == "__main__":
 
     print("All logged metrics:\n" + json.dumps(metrics, indent=2))
 
+    # Step 6: Flush logged metrics to SageMaker Experiments
+    tracker.log_parameters(metrics)
+    
+    time.sleep(5)
+    tracker.close()
     time.sleep(5)
