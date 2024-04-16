@@ -3,3 +3,4 @@ image-classifiers
 tensorflow-addons
 webdataset
 torchdata
+s3torchconnector
