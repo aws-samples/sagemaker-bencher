@@ -7,57 +7,29 @@ import json
 import argparse
 import time
 import random
+from functools import cached_property
 
 import numpy as np
-import torch
-from torchvision.transforms import v2 as tvt
 from PIL import Image
 
+import torch
+import torch.nn as nn
 import torchdata
+from torchvision.transforms import v2 as tvt
+from transformers import ViTForImageClassification
+
 import webdataset as wds
 import s3torchconnector as s3pt
 
 CHANNEL_NAME = 'train'
 DEBUG = True
 
-
 def debug(message):
     if DEBUG:
         print('[DEBUG] ' + message)
 
 
-def identity(x):
-    return x
-
-
-class ModelMock:
-    '''Model mock to emulate a computation of a training step'''
-    def compute(self, computation_time):
-        return time.sleep(computation_time)
-
-
-class MapDataset(torch.utils.data.Dataset):
-    def __init__(self, files, transform=identity):
-        self._files = np.array(files)
-        self._transform = transform
-   
-    @staticmethod
-    def _get_label(file):
-        return file.split(os.path.sep)[-2]
-    
-    @staticmethod
-    def _read(file):
-        return Image.open(file).convert('RGB')
-    
-    def __len__(self):
-        return len(self._files)
-    
-    def __getitem__(self, idx):
-        file = self._files[idx]
-        sample = self._transform(self._read(file))
-        label = int(self._get_label(file)) - 1    # Labels in [0, MAX) range
-        return sample, label
-
+################## BENCHMARK PARAMETER DEFINITIONS ###############
 
 def parse_and_validate_args():
     
@@ -89,16 +61,21 @@ def parse_and_validate_args():
     parser.add_argument('--pin_memory', type=str_bool, default=True)
     parser.add_argument('--batch_drop_last', type=str_bool, default=False)
     parser.add_argument('--compute_time', type=none_or_int, default=None) # in MS
-    parser.add_argument('--torchdata', type=str_bool, default=False)
-    
+
     ### NOT YET IMPLEMENTED
     parser.add_argument('--prefetch_to_gpu', type=str_bool, default=False)
     parser.add_argument('--shuffle', type=str_bool, default=False)
     parser.add_argument('--cache', type=none_or_str, default=None)
-    parser.add_argument('--backbone_model', type=none_or_str, default=None)
     
     ### Parameters that define computation part 
     parser.add_argument('--epochs', type=int, default=1)
+    parser.add_argument('--backbone_model', type=none_or_str, default=None)
+
+    ### Parameters that define checkpointing part
+    parser.add_argument('--ckpt_batches', type=int, default=0)
+    parser.add_argument('--ckpt_mode', type=str, default='disk')
+    parser.add_argument('--ckpt_uri', type=str, default='checkpoints/')
+    parser.add_argument('--ckpt_region', type=str, default=os.environ.get('SAGEMAKER_REGION'))
    
     ### Parameters that define some storage and dataset details for benchmarking 
     parser.add_argument('--input_channel', type=str, default=os.environ.get(f'SM_CHANNEL_{CHANNEL_NAME.upper()}'))
@@ -115,6 +92,106 @@ def parse_and_validate_args():
         raise ValueError("Either compute time or backbone model alias must be set..")
     
     return args
+
+
+################## MODEL CONSTRUCTS ###############
+
+def identity(x):
+    return x
+
+
+class ModelMock:
+    '''Model mock to emulate a computation of a training step'''
+    def train_batch(self, computation_time, **kw):
+        if computation_time > 0:
+            return time.sleep(computation_time/1000)
+        return 
+
+
+class ModelViT:
+    def __init__(self, config):
+        self.cfg = config
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.loss_fn = nn.CrossEntropyLoss()
+
+    @cached_property
+    def model(self):
+        return ViTForImageClassification.from_pretrained(
+            self.cfg.backbone_model, num_labels=self.cfg.dataset_num_classes
+        ).to(self.device)
+
+    @cached_property
+    def optimizer(self):
+        return torch.optim.Adam(self.model.parameters(), lr=0.001)
+
+    def train_batch(self, data, target, batch_idx, **kw):
+        data = data.to(self.device)
+        target = target.to(self.device)
+        self.optimizer.zero_grad(set_to_none=True)
+        outputs = self.model(data)
+        loss = self.loss_fn(outputs.logits, target)
+        loss.backward()
+        self.optimizer.step()
+
+        if self.cfg.ckpt_batches > 0 and (batch_idx + 1) % self.cfg.ckpt_batches == 0:
+            return self.save_checkpoint(batch_idx=batch_idx + 1)
+
+    def save_checkpoint(self, batch_idx):
+        if self.cfg.ckpt_mode == 's3':
+            return save_checkpoint_to_s3(self.model, self.cfg.ckpt_region, self.cfg.ckpt_uri, batch_idx)
+        elif self.cfg.ckpt_mode == 'disk':
+            return save_checkpoint_to_disk(self.model, self.cfg.ckpt_uri, batch_idx)
+        else:
+            raise NotImplementedError("Unknown checkpoint mode '%s'.." % self.cfg.ckpt_mode)
+
+
+def save_checkpoint_to_s3(model, region, uri, batch_idx):
+    checkpoint = s3pt.S3Checkpoint(region=region)
+    # Save checkpoint to S3
+    start_time = time.perf_counter()
+    with checkpoint.writer(uri + f"batch{batch_idx}.ckpt") as writer:
+        torch.save(model.state_dict(), writer)
+    end_time = time.perf_counter()
+    save_time = end_time - start_time
+    print(f"Saving checkpoint to {uri} took {save_time} seconds")
+    return save_time
+
+
+def save_checkpoint_to_disk(model, uri, batch_idx):
+    if not os.path.exists(uri):
+        os.makedirs(uri)
+    path = os.path.join(uri, f"batch{batch_idx}.ckpt")
+    start_time = time.perf_counter()
+    torch.save(model.state_dict(), path)
+    end_time = time.perf_counter()
+    save_time = end_time - start_time
+    print(f"Saving checkpoint to {path} took {save_time} seconds")
+    return save_time
+
+
+################## DATASET CONSTRUCTS ###############
+
+class MapDataset(torch.utils.data.Dataset):
+    def __init__(self, files, transform=identity):
+        self._files = np.array(files)
+        self._transform = transform
+   
+    @staticmethod
+    def _get_label(file):
+        return file.split(os.path.sep)[-2]
+    
+    @staticmethod
+    def _read(file):
+        return Image.open(file).convert('RGB')
+    
+    def __len__(self):
+        return len(self._files)
+    
+    def __getitem__(self, idx):
+        file = self._files[idx]
+        sample = self._transform(self._read(file))
+        label = int(self._get_label(file)) - 1    # Labels in [0, MAX) range
+        return sample, label
 
 def _make_pt_dataset(config, transform):
     files = glob.glob(config.input_channel + '/**/*.jpg')
@@ -211,6 +288,8 @@ def _make_fsspec_iter_dataset(config, transform):
     return dataset
 
 
+################## BENCHMARK CONSTRUCTS ###############
+
 def build_dataloader(config):
 
     transform = tvt.Compose([
@@ -270,16 +349,9 @@ def _build_model_mock(cfg):
 
 def _build_model(cfg):
     raise NotImplementedError("Not yet implemented..")
-
-def train_model(model, dataloader, cfg):
-    if cfg.compute_time is not None: 
-        stats = _train_model_mock(model, dataloader, cfg)
-    elif cfg.backbone_model is not None:
-        stats = _train_model(model, dataloader, cfg)
-    return stats
     
-def _train_model_mock(model, dataloader, cfg):
-    t_stats, img_tot_list, ep_times = {}, [], []
+def train_model(model, dataloader, cfg):
+    t_stats, img_tot_list, ep_times, ckpt_times = {}, [], [], []
     t_train_start = t_epoch_start = time.perf_counter()
 
     for epoch in range(cfg.epochs):
@@ -289,8 +361,17 @@ def _train_model_mock(model, dataloader, cfg):
             batch_size = images.shape[0]
             img_tot += batch_size
 
-            if cfg.compute_time > 0:
-                model.compute(cfg.compute_time/1000) # ms --> s
+            result = model.train_batch(
+                data=images,
+                target=labels,
+                batch_idx=iteration,
+                computation_time=cfg.compute_time/1000   # ms --> s
+            )
+
+            if result:
+                ckpt_times.add(result)
+
+            # TODO: remove later
             print(iteration, '-->', images.shape, labels.shape, labels)
 
         # log metrics
@@ -303,13 +384,12 @@ def _train_model_mock(model, dataloader, cfg):
     t_stats['t_training_exact'] = t_train_tot
     t_stats['img_sec_ave_tot'] = sum(img_tot_list) / t_train_tot
     t_stats['img_tot'] = sum(img_tot_list)
-    t_stats.update({f't_epoch_{ep}': t for ep, t in enumerate(ep_times, 1)})
+    t_stats.update({f't_epoch_{i}': t for i, t in enumerate(ep_times, 1)})
+    t_stats.update({f't_ckpt_{i}': t for i, t in enumerate(ckpt_times, 1)})
     return t_stats
 
-def _train_model(model, dataloader, cfg):
-    raise NotImplementedError("Not yet implemented..")
 
-
+################## MAIN CONSTRUCT ###############
 
 if __name__ == "__main__":
 
