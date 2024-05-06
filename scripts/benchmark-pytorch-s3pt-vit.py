@@ -29,7 +29,7 @@ def debug(message):
         print('[DEBUG] ' + message)
 
 
-################## BENCHMARK PARAMETER DEFINITIONS ###############
+################## BENCHMARK PARAMETER DEFINITIONS ###################
 
 def parse_and_validate_args():
     
@@ -61,11 +61,6 @@ def parse_and_validate_args():
     parser.add_argument('--pin_memory', type=str_bool, default=True)
     parser.add_argument('--batch_drop_last', type=str_bool, default=False)
     parser.add_argument('--compute_time', type=none_or_int, default=None) # in MS
-
-    ### NOT YET IMPLEMENTED
-    parser.add_argument('--prefetch_to_gpu', type=str_bool, default=False)
-    parser.add_argument('--shuffle', type=str_bool, default=False)
-    parser.add_argument('--cache', type=none_or_str, default=None)
     
     ### Parameters that define computation part 
     parser.add_argument('--epochs', type=int, default=1)
@@ -94,7 +89,7 @@ def parse_and_validate_args():
     return args
 
 
-################## MODEL CONSTRUCTS ###############
+################## MODEL CONSTRUCTS ###################
 
 def identity(x):
     return x
@@ -102,9 +97,12 @@ def identity(x):
 
 class ModelMock:
     '''Model mock to emulate a computation of a training step'''
-    def train_batch(self, computation_time, **kw):
-        if computation_time > 0:
-            return time.sleep(computation_time/1000)
+    def __init__(self, config):
+        self.cfg = config
+    
+    def train_batch(self, data, target, batch_idx):
+        if self.cfg.compute_time > 0:
+            return time.sleep(self.cfg.compute_time / 1000)
         return 
 
 
@@ -117,14 +115,16 @@ class ModelViT:
     @cached_property
     def model(self):
         return ViTForImageClassification.from_pretrained(
-            self.cfg.backbone_model, num_labels=self.cfg.dataset_num_classes
+            self.cfg.backbone_model,
+            num_labels=self.cfg.dataset_num_classes,
+            ignore_mismatched_sizes=True
         ).to(self.device)
 
     @cached_property
     def optimizer(self):
         return torch.optim.Adam(self.model.parameters(), lr=0.001)
 
-    def train_batch(self, data, target, batch_idx, **kw):
+    def train_batch(self, data, target, batch_idx):
         data = data.to(self.device)
         target = target.to(self.device)
         self.optimizer.zero_grad(set_to_none=True)
@@ -169,7 +169,7 @@ def save_checkpoint_to_disk(model, uri, batch_idx):
     return save_time
 
 
-################## DATASET CONSTRUCTS ###############
+################## DATASET CONSTRUCTS ###################
 
 class MapDataset(torch.utils.data.Dataset):
     def __init__(self, files, transform=identity):
@@ -190,7 +190,7 @@ class MapDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         file = self._files[idx]
         sample = self._transform(self._read(file))
-        label = int(self._get_label(file)) - 1    # Labels in [0, MAX) range
+        label = int(self._get_label(file))    # Labels in [0, MAX) range
         return sample, label
 
 def _make_pt_dataset(config, transform):
@@ -288,7 +288,7 @@ def _make_fsspec_iter_dataset(config, transform):
     return dataset
 
 
-################## BENCHMARK CONSTRUCTS ###############
+################## BENCHMARK CONSTRUCTS #################
 
 def build_dataloader(config):
 
@@ -297,7 +297,7 @@ def build_dataloader(config):
         tvt.ToDtype(torch.uint8, scale=True),
         tvt.RandomResizedCrop(size=(config.input_dim, config.input_dim), antialias=False), #antialias=True
         tvt.ToDtype(torch.float32, scale=True),
-        #tvt.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        tvt.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
 
     # Build dataset
@@ -338,41 +338,30 @@ def build_dataloader(config):
 
 def build_model(cfg):
     if cfg.compute_time is not None:
-        model = _build_model_mock(cfg)
+        model = ModelMock(cfg)
     elif cfg.backbone_model is not None:
-        model = _build_model(cfg)
+        model = ModelViT(cfg)
     return model
 
-def _build_model_mock(cfg):
-    model = ModelMock()
-    return model
 
-def _build_model(cfg):
-    raise NotImplementedError("Not yet implemented..")
-    
 def train_model(model, dataloader, cfg):
-    t_stats, img_tot_list, ep_times, ckpt_times = {}, [], [], []
+    metrics = {}
+    img_tot_list, ep_times, ckpt_times = [], [], []
     t_train_start = t_epoch_start = time.perf_counter()
 
     for epoch in range(cfg.epochs):
         img_tot = 0
         for iteration, (images, labels) in enumerate(dataloader, 1):
             # do training step
-            batch_size = images.shape[0]
+            batch_size = len(images)
             img_tot += batch_size
 
-            result = model.train_batch(
-                data=images,
-                target=labels,
-                batch_idx=iteration,
-                computation_time=cfg.compute_time/1000   # ms --> s
-            )
+            result = model.train_batch(images, labels, iteration)
 
             if result:
-                ckpt_times.add(result)
+                ckpt_times.append(result)
 
-            # TODO: remove later
-            print(iteration, '-->', images.shape, labels.shape, labels)
+            #print(iteration, '-->', images.shape, labels.shape, labels)
 
         # log metrics
         img_tot_list.append(img_tot)
@@ -381,42 +370,42 @@ def train_model(model, dataloader, cfg):
 
     # log metrics
     t_train_tot = time.perf_counter() - t_train_start
-    t_stats['t_training_exact'] = t_train_tot
-    t_stats['img_sec_ave_tot'] = sum(img_tot_list) / t_train_tot
-    t_stats['img_tot'] = sum(img_tot_list)
-    t_stats.update({f't_epoch_{i}': t for i, t in enumerate(ep_times, 1)})
-    t_stats.update({f't_ckpt_{i}': t for i, t in enumerate(ckpt_times, 1)})
-    return t_stats
+    metrics['t_training_exact'] = t_train_tot
+    metrics['img_sec_ave_tot'] = sum(img_tot_list) / t_train_tot
+    metrics['img_tot'] = sum(img_tot_list)
+    metrics.update({f't_epoch_{i}': t for i, t in enumerate(ep_times, 1)})
+    metrics.update({f't_ckpt_{i}': t for i, t in enumerate(ckpt_times, 1)})
+    return metrics
 
 
-################## MAIN CONSTRUCT ###############
+################## MAIN CONSTRUCT ##################
 
 if __name__ == "__main__":
 
-    from smexperiments.tracker import Tracker
+    #from smexperiments.tracker import Tracker
 
     # Step 1: Parse the parameters sent by the SageMaker client to the script
-    args = parse_and_validate_args()
+    cfg = parse_and_validate_args()
 
-    print("Benchmarking params:\n" + json.dumps(vars(args), indent=2))
+    print("Benchmarking params:\n" + json.dumps(vars(cfg), indent=2))
 
     # Step 2: Load SageMaker Experiment tracker to log benchmark metrics
-    tracker = Tracker.load()
+    #tracker = Tracker.load()
     
     # Step 3: Build dataloader
-    dataloader = build_dataloader(args)
+    dataloader = build_dataloader(cfg)
 
     # Step 4: Build model
-    model = build_model(args)
+    model = build_model(cfg)
 
     # Step 5: Do training run
-    metrics = train_model(model, dataloader, args)
+    metrics = train_model(model, dataloader, cfg)
 
     print("All logged metrics:\n" + json.dumps(metrics, indent=2))
 
     # Step 6: Flush logged metrics to SageMaker Experiments
-    tracker.log_parameters(metrics)
+    #tracker.log_parameters(metrics)
     
     time.sleep(5)
-    tracker.close()
-    time.sleep(5)
+    #tracker.close()
+    #time.sleep(5)

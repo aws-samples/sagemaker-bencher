@@ -4,3 +4,4 @@ tensorflow-addons
 webdataset
 torchdata
 s3torchconnector
+transformers

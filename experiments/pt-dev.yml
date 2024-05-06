@@ -1,0 +1,93 @@
+# --- MAIN EXPERIMENT SETTINGS
+name: pt-dev
+description: 'Benchmarks -- Blog: Choose the best data source for your Amazon SageMaker training job'
+role: SageMakerRoleBenchmark
+region: us-west-2
+bucket: null                # 'null' for Default Bucket
+output_prefix: experiments
+parallelism: 0             # 0 is sync execution, >=1 is async execution
+repeat: 1
+disable_profiler: True
+order: interleave           # 'default | 'interleave' | 'random' - order to run the 'repeat'ed trials (not to create hot-spots)
+clean: False                # 'True' - delete all previous trials before start
+
+
+
+# --- DATASET DEFINITIONS
+datasets:
+  Synth-wds-jpg-100MB-a-1MB:
+      type: synthetic
+      format: tar/jpg
+      bucket: null
+      prefix: 'datasets/synthetic'
+      dimension: [290, 290, 3]
+      num_records: 10
+      num_files: 10
+      num_copies: 10
+      num_classes: 4
+
+  Synth-jpg-10MB-a-100KB:
+    type: synthetic
+    format: jpg
+    bucket: null
+    prefix: 'datasets/synthetic'
+    dimension: [290, 290, 3]
+    num_files: 100
+    num_copies: 1
+    num_classes: 4
+
+
+# --- FSx FILESYSTEM SETUP (is required only if 'fsx' input mode is used)
+fsx:
+  fsx_file_system_id: fs-XXXXXXXXXXXXXXXXX   # <--- specify your FSX filesystem ID
+  fsx_file_system_directory_path: /fsx
+  security_group_ids:
+      - sg-XXXXXXXXXXXXXXXXX                 # <--- specify your Security Group IDs
+  subnets:
+      - subnet-XXXXXXXXXXXXXXXXX             # <--- specify your Subnet IDs
+
+
+
+# --- TRIAL DEFINITIONS
+# Default values for trials (if not overriden by specific trial)
+base_trial:
+  script: benchmark-pytorch-s3pt-vit.py
+  source_dir: scripts
+  framework: pt
+  #framework_version: '2.2'
+  #py_version: py310
+  image_uri: '763104351884.dkr.ecr.us-west-2.amazonaws.com/pytorch-training:2.2-cpu-py310'
+  volume_size: 250
+  instance_type: ml.g5.xlarge
+  instance_count: 1
+  max_run: 36000
+  hyperparameters:
+    prefetch_size: None
+    num_workers: 4
+    epochs: 2
+    batch_size: 10
+    input_dim: 224
+    pin_memory: True
+    batch_drop_last: False
+    compute_time: None                            # None or <time in MS> 
+    backbone_model: google/vit-base-patch16-224   # None or <model HF Model Hub ID>
+    ckpt_batches: 5
+    ckpt_mode: s3
+    ckpt_uri: s3://sagemaker-benchmark-us-west-2-242711262407/checkpoints/
+
+
+
+# Trial definitions
+trials:
+
+  # - inputs:
+  #     train:
+  #       dataset: Synth-wds-jpg-100MB-a-1MB
+  #       input_mode: ffm
+
+  - inputs:
+      train:
+        dataset: Synth-jpg-10MB-a-100KB
+        input_mode: ffm
+
+  
