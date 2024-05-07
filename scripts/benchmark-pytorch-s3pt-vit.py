@@ -382,7 +382,7 @@ def train_model(model, dataloader, cfg):
 
 if __name__ == "__main__":
 
-    #from smexperiments.tracker import Tracker
+    from smexperiments.tracker import Tracker
 
     # Step 1: Parse the parameters sent by the SageMaker client to the script
     cfg = parse_and_validate_args()
@@ -390,7 +390,7 @@ if __name__ == "__main__":
     print("Benchmarking params:\n" + json.dumps(vars(cfg), indent=2))
 
     # Step 2: Load SageMaker Experiment tracker to log benchmark metrics
-    #tracker = Tracker.load()
+    tracker = Tracker.load()
     
     # Step 3: Build dataloader
     dataloader = build_dataloader(cfg)
@@ -404,8 +404,8 @@ if __name__ == "__main__":
     print("All logged metrics:\n" + json.dumps(metrics, indent=2))
 
     # Step 6: Flush logged metrics to SageMaker Experiments
-    #tracker.log_parameters(metrics)
+    tracker.log_parameters(metrics)
     
     time.sleep(5)
-    #tracker.close()
-    #time.sleep(5)
+    tracker.close()
+    time.sleep(5)
