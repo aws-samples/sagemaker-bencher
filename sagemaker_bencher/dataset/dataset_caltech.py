@@ -60,7 +60,7 @@ class CaltechBenchmarkDataset(BenchmarkDataset):
 
         super().__init__(name, format=format, type=type, bucket=bucket, prefix=prefix, region=region)
 
-    def build(self, overwrite=False, source_file=None):
+    def build(self, overwrite=False, source_file=None, destination='s3'):
         """Build the dataset and upload to s3.
 
         Args:
@@ -80,7 +80,10 @@ class CaltechBenchmarkDataset(BenchmarkDataset):
         img_list, label_list = self._parse_dataset(file_extensions=['.jpg'])
 
         benchmark_files, remote_subdirs = self._make_benchmark_files(img_list, label_list)
-        utils.upload_dataset(self, benchmark_files, remote_subdirs)
+        if destination == 's3':
+            utils.upload_dataset(self, benchmark_files, remote_subdirs)
+        else:
+            shutil.copytree(self.root_dir, os.path.join(destination, self.name))
         self._cleanup()
 
     def _download_and_extract_from_source(self, untar=False, source_file=None):

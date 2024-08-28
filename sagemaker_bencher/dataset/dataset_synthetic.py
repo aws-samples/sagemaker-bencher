@@ -67,7 +67,7 @@ class SyntheticBenchmarkDataset(BenchmarkDataset):
         super().__init__(name, format=format, type=type, bucket=bucket, prefix=prefix, region=region)
 
 
-    def build(self, overwrite=False):
+    def build(self, overwrite=False, destination='s3'):
         """Build the dataset and upload to s3.
 
         Args:
@@ -84,7 +84,10 @@ class SyntheticBenchmarkDataset(BenchmarkDataset):
             
         self.root_dir = tempfile.mkdtemp() # tempfile.mkdtemp(prefix=self.name + '-', dir='test-build')
         benchmark_files, remote_subdirs = self._make_benchmark_files()
-        utils.upload_dataset(self, benchmark_files, remote_subdirs)
+        if destination == 's3':
+            utils.upload_dataset(self, benchmark_files, remote_subdirs)
+        else:
+            shutil.copytree(self.root_dir, os.path.join(destination, self.name))
         self._cleanup()
 
 

@@ -347,7 +347,7 @@ class Experiment:
 
         print(f"Building the datasets for '{self.name}' experiment..")
         for dataset in self.datasets.values():
-            dataset.build()
+            dataset.build(destination=bootstrap if bootstrap else 's3')
 
         if bootstrap: 
             return
