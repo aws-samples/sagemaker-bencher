@@ -183,7 +183,7 @@ class SyntheticBenchmarkDataset(BenchmarkDataset):
         """
         label = random.randrange(self.num_classes)
         loc = 255 * (label + 1) / (self.num_classes + 1)
-        arr = np.random.normal(loc=loc, scale=255/self.num_classes/2, size=self.dimension)
+        arr = np.random.normal(loc=loc, scale=30, size=self.dimension)
         arr = np.clip(arr, 0, 255).astype(np.uint8)
         return arr, label
     
