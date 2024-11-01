@@ -3,8 +3,8 @@ Synth-tfr-raw-100MB-a-1MB:
     format: tfrecord/raw
     bucket: null
     prefix: 'datasets/synthetic'
-    dimension: [300, 300, 3]
-    num_records: 4
+    dimension: [190, 190, 3]
+    num_records: 10
     num_files: 10
     num_copies: 10
     num_classes: 2
@@ -14,8 +14,8 @@ Synth-tfr-raw-1GB-a-1MB:
     format: tfrecord/raw
     bucket: null
     prefix: 'datasets/synthetic'
-    dimension: [300, 300, 3]
-    num_records: 4
+    dimension: [190, 190, 3]
+    num_records: 10
     num_files: 50
     num_copies: 20
     num_classes: 2
@@ -25,8 +25,8 @@ Synth-tfr-raw-1GB-a-100MB:
     format: tfrecord/raw
     bucket: null
     prefix: 'datasets/synthetic'
-    dimension: [300, 300, 3]
-    num_records: 400
+    dimension: [190, 190, 3]
+    num_records: 1000
     num_files: 1
     num_copies: 10
     num_classes: 2
@@ -36,8 +36,8 @@ Synth-tfr-raw-50GB-a-1MB:
     format: tfrecord/raw
     bucket: null
     prefix: 'datasets/synthetic'
-    dimension: [300, 300, 3]
-    num_records: 4
+    dimension: [190, 190, 3]
+    num_records: 10
     num_files: 50
     num_copies: 1000
     num_classes: 2
@@ -47,8 +47,8 @@ Synth-tfr-raw-50GB-a-100MB:
     format: tfrecord/raw
     bucket: null
     prefix: 'datasets/synthetic'
-    dimension: [300, 300, 3]
-    num_records: 400
+    dimension: [190, 190, 3]
+    num_records: 1000
     num_files: 1
     num_copies: 500
     num_classes: 2
@@ -58,8 +58,8 @@ Synth-tfr-raw-100GB-a-1MB:
     format: tfrecord/raw
     bucket: null
     prefix: 'datasets/synthetic'
-    dimension: [300, 300, 3]
-    num_records: 4
+    dimension: [190, 190, 3]
+    num_records: 10
     num_files: 100
     num_copies: 1000
     num_classes: 2
@@ -69,8 +69,8 @@ Synth-tfr-raw-100GB-a-1GB:
     format: tfrecord/raw
     bucket: null
     prefix: 'datasets/synthetic'
-    dimension: [300, 300, 3]
-    num_records: 4000
+    dimension: [190, 190, 3]
+    num_records: 10000
     num_files: 10
     num_copies: 10
     num_classes: 2
@@ -80,8 +80,8 @@ Synth-tfr-raw-1TB-a-1MB:
     format: tfrecord/raw
     bucket: null
     prefix: 'datasets/synthetic'
-    dimension: [300, 300, 3]
-    num_records: 4
+    dimension: [190, 190, 3]
+    num_records: 10
     num_files: 1000
     num_copies: 1000
     num_classes: 2
@@ -91,8 +91,8 @@ Synth-tfr-raw-1TB-a-1GB:
     format: tfrecord/raw
     bucket: null
     prefix: 'datasets/synthetic'
-    dimension: [300, 300, 3]
-    num_records: 4000
+    dimension: [190, 190, 3]
+    num_records: 10000
     num_files: 10
     num_copies: 100
     num_classes: 2
@@ -104,7 +104,7 @@ Synth-tfr-jpg-100MB-a-1MB:
     format: tfrecord/jpg
     bucket: null
     prefix: 'datasets/synthetic'
-    dimension: [290, 290, 3]
+    dimension: [180, 180, 3]
     num_records: 10
     num_files: 10
     num_copies: 10
@@ -115,7 +115,7 @@ Synth-tfr-jpg-1GB-a-100MB:
     format: tfrecord/jpg
     bucket: null
     prefix: 'datasets/synthetic'
-    dimension: [290, 290, 3]
+    dimension: [180, 180, 3]
     num_records: 1000
     num_files: 1
     num_copies: 10
@@ -126,7 +126,7 @@ Synth-tfr-jpg-10GB-a-100MB:
     format: tfrecord/jpg
     bucket: null
     prefix: 'datasets/synthetic'
-    dimension: [290, 290, 3]
+    dimension: [180, 180, 3]
     num_records: 1000
     num_files: 10
     num_copies: 10
@@ -137,7 +137,7 @@ Synth-tfr-jpg-25GB-a-100MB:
     format: tfrecord/jpg
     bucket: null
     prefix: 'datasets/synthetic'
-    dimension: [290, 290, 3]
+    dimension: [180, 180, 3]
     num_records: 1000
     num_files: 10
     num_copies: 25
@@ -148,7 +148,7 @@ Synth-tfr-jpg-50GB-a-100MB:
     format: tfrecord/jpg
     bucket: null
     prefix: 'datasets/synthetic'
-    dimension: [290, 290, 3]
+    dimension: [180, 180, 3]
     num_records: 1000
     num_files: 10
     num_copies: 50
@@ -161,7 +161,7 @@ Synth-jpg-100MB-a-100KB:
     format: jpg
     bucket: null
     prefix: 'datasets/synthetic'
-    dimension: [290, 290, 3]
+    dimension: [180, 180, 3]
     num_files: 1000
     num_copies: 1
     num_classes: 4
@@ -171,7 +171,7 @@ Synth-jpg-1GB-a-100KB:
     format: jpg
     bucket: null
     prefix: 'datasets/synthetic'
-    dimension: [290, 290, 3]
+    dimension: [180, 180, 3]
     num_files: 1000
     num_copies: 10
     num_classes: 4
@@ -181,7 +181,7 @@ Synth-jpg-10GB-a-100KB:
     format: jpg
     bucket: null
     prefix: 'datasets/synthetic'
-    dimension: [290, 290, 3]
+    dimension: [180, 180, 3]
     num_files: 10000
     num_copies: 10
     num_classes: 4
@@ -191,7 +191,7 @@ Synth-jpg-25GB-a-100KB:
     format: jpg
     bucket: null
     prefix: 'datasets/synthetic'
-    dimension: [290, 290, 3]
+    dimension: [180, 180, 3]
     num_files: 10000
     num_copies: 25
     num_classes: 4
@@ -201,7 +201,7 @@ Synth-jpg-50GB-a-100KB:
     format: jpg
     bucket: null
     prefix: 'datasets/synthetic'
-    dimension: [290, 290, 3]
+    dimension: [180, 180, 3]
     num_files: 10000
     num_copies: 50
     num_classes: 4
@@ -213,7 +213,7 @@ Synth-wds-jpg-100MB-a-1MB:
     format: tar/jpg
     bucket: null
     prefix: 'datasets/synthetic'
-    dimension: [290, 290, 3]
+    dimension: [180, 180, 3]
     num_records: 10
     num_files: 10
     num_copies: 10
@@ -224,7 +224,7 @@ Synth-wds-jpg-1GB-a-100MB:
     format: tar/jpg
     bucket: null
     prefix: 'datasets/synthetic'
-    dimension: [290, 290, 3]
+    dimension: [180, 180, 3]
     num_records: 1000
     num_files: 1
     num_copies: 10
@@ -235,7 +235,7 @@ Synth-wds-jpg-10GB-a-100MB:
     format: tar/jpg
     bucket: null
     prefix: 'datasets/synthetic'
-    dimension: [290, 290, 3]
+    dimension: [180, 180, 3]
     num_records: 1000
     num_files: 10
     num_copies: 10
@@ -246,7 +246,7 @@ Synth-wds-jpg-25GB-a-100MB:
     format: tar/jpg
     bucket: null
     prefix: 'datasets/synthetic'
-    dimension: [290, 290, 3]
+    dimension: [180, 180, 3]
     num_records: 1000
     num_files: 10
     num_copies: 25
@@ -257,7 +257,7 @@ Synth-wds-jpg-50GB-a-100MB:
     format: tar/jpg
     bucket: null
     prefix: 'datasets/synthetic'
-    dimension: [290, 290, 3]
+    dimension: [180, 180, 3]
     num_records: 1000
     num_files: 10
     num_copies: 50
